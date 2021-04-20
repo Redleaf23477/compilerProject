@@ -50,13 +50,14 @@
 
 sigma               [\x20-\x7e]
 special_char        [\\'"]
-escape_seq          \\[\\'"0tn]
-c_char              ([\x20-\x7e]{-}[\\'"])|(\\[\\'"0tn])
+    /*escape_seq          \\[\\'"0tn]*/
+escape_seq          \\.
+c_char              ([\x20-\x7e]{-}[\\'"])|(\\.)
 operators           \+|-|\*|\/|%|\+\+|--|<|<=|>|>=|==|!=|=|&&|\|\||!|&|\|
 punctuations        :|;|,|\.|\[|\]|\(|\)|\{|\}
 keywords            for|do|while|break|continue|if|else|return|struct|switch|case|default|void|int|double|float|char|const|signed|unsigned|short|long
 macros              NULL|__COUNTER__|__LINE__|INT_MAX|INT_MIN|CHAR_MAX|CHAR_MIN|MAX|MIN
-identifiers         [a-zA-z_][a-zA-Z0-9_]*
+identifiers         [a-zA-Z_][a-zA-Z0-9_]*
 
 %x LINE_COMMENT
 %x BLOCK_COMMENT
@@ -110,93 +111,110 @@ identifiers         [a-zA-z_][a-zA-Z0-9_]*
      **********************************/
 
 \n  { 
+    info("consume new line");
     pushToLine(yytext);
     printLine();
     clearLine();
 }
 
 "//" /* begin line comment */ {
-    pushToLine(yytext);
     info("enter line comment mode");
+    pushToLine(yytext);
     BEGIN LINE_COMMENT;
 }
 
 "/*" /* begin block comment */ {
-    pushToLine(yytext);
     info("enter block comment mode");
+    pushToLine(yytext);
     BEGIN BLOCK_COMMENT;
 }
 
 \"{c_char}*\" /* string literals */ {
+    info("consume string literal");
     pushToLine(yytext);
     printToken(Token::STR, yytext);
 }
 
 \'{c_char}\' /* char literals */ {
+    info("consume char literal");
     pushToLine(yytext);
     printToken(Token::CHAR, yytext);
 }
 
 ^[ \t]*#pragma[ \t]+source[ \t]+on$ /* #pragma source on */ {
-    pushToLine(yytext);
     info("set pragma source on");
+    pushToLine(yytext);
     source_on = true;
 }
 
-^#[ \t]*pragma[ \t]+source[ \t]+off$ /* #pragma source off */ {
-    pushToLine(yytext);
+^[ \t]*#pragma[ \t]+source[ \t]+off$ /* #pragma source off */ {
     info("set pragma source off");
+    pushToLine(yytext);
     source_on = false;
 }
 
-^#[ \t]*pragma[ \t]+token[ \t]+on$ /* #pragma token on */ {
-    pushToLine(yytext);
+^[ \t]*#pragma[ \t]+token[ \t]+on$ /* #pragma token on */ {
     info("set pragma token on");
+    pushToLine(yytext);
     token_on = true;
 }
 
-^#[ \t]*pragma[ \t]+token[ \t]+off$ /* #pragma token off */ {
-    pushToLine(yytext);
+^[ \t]*#pragma[ \t]+token[ \t]+off$ /* #pragma token off */ {
     info("set pragma token off");
+    pushToLine(yytext);
     token_on = false;
 }
 
-[\+-]?[0-9]+\.[0-9]* /* float point literal */ {
+[\+-]?[0-9]+\.[0-9]* /* float point literal case1: (sign)x. */ {
+    info("consume float point literal");
+    pushToLine(yytext);
+    printToken(Token::FP, yytext);
+}
+
+[\+-]?[0-9]*\.[0-9]+ /* float point literal case2: (sign).x */ {
+    info("consume float point literal");
     pushToLine(yytext);
     printToken(Token::FP, yytext);
 }
 
 [\+-]?[0-9]+ /* int literal */ {
+    info("consume int literal");
     pushToLine(yytext);
     printToken(Token::INT, yytext);
 }
 
 {operators} {
+    info("consume operator");
     pushToLine(yytext);
     printToken(Token::OP, yytext);
 }
 
 {punctuations} {
+    info("consume puncuation");
     pushToLine(yytext);
     printToken(Token::PUNC, yytext);
 }
 
 {keywords} {
+    info("consume keywords");
     pushToLine(yytext);
     printToken(Token::KEY, yytext);
 }
 
 {macros} {
+    info("consume macro");
     pushToLine(yytext);
     printToken(Token::MACRO, yytext);
 }
 
 {identifiers} {
+    info("consume id");
     pushToLine(yytext);
     printToken(Token::ID, yytext);
 }
 
 . /* not matching any rule */ {
+    info("consume an unmatched char");
     pushToLine(yytext);
 }
 
