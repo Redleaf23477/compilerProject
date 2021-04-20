@@ -25,8 +25,15 @@
     }
 
     namespace Token {
-        const char *str {"string"};
-        const char *chr {"char"};
+        constexpr char STR[] {"string"};
+        constexpr char CHAR[] {"char"};
+        constexpr char FP[] {"float"};
+        constexpr char INT[] {"integer"};
+        constexpr char OP[] {"op"};
+        constexpr char PUNC[] {"punc"};
+        constexpr char KEY[] {"key"};
+        constexpr char MACRO[] {"macro"};
+        constexpr char ID[] {"id"};
     }
     
     void printToken(std::string_view tokType, std::string_view tok) {
@@ -40,13 +47,22 @@ sigma               [\x20-\x7e]
 special_char        [\\'"]
 escape_seq          \\[\\'"0tn]
 c_char              ([\x20-\x7e]{-}[\\'"])|(\\[\\'"0tn])
+operators           \+|-|\*|\/|%|\+\+|--|<|<=|>|>=|==|!=|=|&&|\|\||!|&|\|
+punctuations        :|;|,|\.|\[|\]|\(|\)|\{|\}
+keywords            for|do|while|break|continue|if|else|return|struct|switch|case|default|void|int|double|float|char|const|signed|unsigned|short|long
+macros              NULL|__COUNTER__|__LINE__|INT_MAX|INT_MIN|CHAR_MAX|CHAR_MIN|MAX|MIN
+identifiers         [a-zA-z_][a-zA-Z0-9_]*
 
 %x LINE_COMMENT
 %x BLOCK_COMMENT
 
 %%
 
-    /* LINE COMMENT related rules */
+    /**********************************
+     *
+     * LINE COMMENT related rules 
+     *
+     **********************************/
 
 <LINE_COMMENT>\n {
     pushToLine(yytext);
@@ -56,11 +72,15 @@ c_char              ([\x20-\x7e]{-}[\\'"])|(\\[\\'"0tn])
     clearLine();
 }
 
-<LINE_COMMENT>{sigma} {
+<LINE_COMMENT>. {
     pushToLine(yytext);
 }
 
-    /* BLOCK COMMENT related rules */
+    /**********************************
+     *
+     * BLOCK COMMENT related rules 
+     *
+     **********************************/
 
 <BLOCK_COMMENT>\n {
     pushToLine(yytext);
@@ -74,11 +94,15 @@ c_char              ([\x20-\x7e]{-}[\\'"])|(\\[\\'"0tn])
     BEGIN 0;
 }
 
-<BLOCK_COMMENT>{sigma} {
+<BLOCK_COMMENT>. {
     pushToLine(yytext);
 }
 
-    /* normal mode related rules */
+    /**********************************
+     *
+     * Normal mode related rules
+     *
+     **********************************/
 
 \n  { 
     pushToLine(yytext);
@@ -86,29 +110,88 @@ c_char              ([\x20-\x7e]{-}[\\'"])|(\\[\\'"0tn])
     clearLine();
 }
 
-"//" {
+"//" /* begin line comment */ {
     pushToLine(yytext);
     info << "enter line comment mode" << std::endl;
     BEGIN LINE_COMMENT;
 }
 
-"/*" {
+"/*" /* begin block comment */ {
     pushToLine(yytext);
     info << "enter block comment mode" << std::endl;
     BEGIN BLOCK_COMMENT;
 }
 
-\"{c_char}*\" {
+\"{c_char}*\" /* string literals */ {
     pushToLine(yytext);
-    printToken(Token::str, yytext);
+    printToken(Token::STR, yytext);
 }
 
-\'{c_char}\' {
+\'{c_char}\' /* char literals */ {
     pushToLine(yytext);
-    printToken(Token::chr, yytext);
+    printToken(Token::CHAR, yytext);
 }
 
-{c_char} {
+^#pragma[ \t]+source[ \t]+on$ /* #pragma source on */ {
+    pushToLine(yytext);
+    info << "set pragma source on" << std::endl;
+    source_on = true;
+}
+
+^#pragma[ \t]+source[ \t]+off$ /* #pragma source off */ {
+    pushToLine(yytext);
+    info << "set pragma source off" << std::endl;
+    source_on = false;
+}
+
+^#pragma[ \t]+token[ \t]+on$ /* #pragma token on */ {
+    pushToLine(yytext);
+    info << "set pragma token on" << std::endl;
+    token_on = true;
+}
+
+^#pragma[ \t]+token[ \t]+off$ /* #pragma token off */ {
+    pushToLine(yytext);
+    info << "set pragma token off" << std::endl;
+    token_on = false;
+}
+
+[\+-]?[0-9]+\.[0-9]* /* float point literal */ {
+    pushToLine(yytext);
+    printToken(Token::FP, yytext);
+}
+
+[\+-]?[0-9]+ /* int literal */ {
+    pushToLine(yytext);
+    printToken(Token::INT, yytext);
+}
+
+{operators} {
+    pushToLine(yytext);
+    printToken(Token::OP, yytext);
+}
+
+{punctuations} {
+    pushToLine(yytext);
+    printToken(Token::PUNC, yytext);
+}
+
+{keywords} {
+    pushToLine(yytext);
+    printToken(Token::KEY, yytext);
+}
+
+{macros} {
+    pushToLine(yytext);
+    printToken(Token::MACRO, yytext);
+}
+
+{identifiers} {
+    pushToLine(yytext);
+    printToken(Token::ID, yytext);
+}
+
+. /* not matching any rule */ {
     pushToLine(yytext);
 }
 
