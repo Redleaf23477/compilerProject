@@ -5,20 +5,22 @@ CXXFLAGS = -std=c++17
 
 all: lexpp cpp
 
-lex: hw1.l
-	${FLEX} -o hw1.yy.c $?
+dev: lexpp dev_cpp
 
-c: hw1.yy.c
-	${CC} $? -o hw1 -lfl
-
-lexpp: hw1.l
+lexpp: scanner.l
 	${FLEX} -o hw1.yy.cpp $?
 
 cpp: hw1.yy.cpp
-	${CXX} ${CXXFLAGS} $? -o hw1 -lfl
+	${CXX} ${CXXFLAGS} $? -o scanner -lfl
+	chmod +x scanner
+
+dev_cpp: hw1.yy.cpp
+	${CXX} ${CXXFLAGS} -DDEV $? -o scanner -lfl
+	chmod +x scanner
+
 
 
 .PHONY: clean
 
 clean:
-	rm -f hw1.l hw1.yy.c hw1
+	rm -f hw1.yy.cpp scanner

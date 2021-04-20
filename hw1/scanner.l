@@ -1,7 +1,12 @@
 %{
     #include <iostream>
     #include <string>
-    #define info std::cerr << "[INFO]"
+
+    #ifdef DEV
+    #define info(x) do { std::cerr << "[INFO]" << x << std::endl; } while (0)
+    #else
+    #define info(x) do {} while (0)
+    #endif
 
     extern "C" int yylex();
     
@@ -66,7 +71,7 @@ identifiers         [a-zA-z_][a-zA-Z0-9_]*
 
 <LINE_COMMENT>\n {
     pushToLine(yytext);
-    info << "exit line comment mode" << std::endl;
+    info("exit line comment mode");
     BEGIN 0;
     printLine();
     clearLine();
@@ -90,7 +95,7 @@ identifiers         [a-zA-z_][a-zA-Z0-9_]*
 
 <BLOCK_COMMENT>"*/" {
     pushToLine(yytext);
-    info << "exit line comment mode" << std::endl;
+    info("exit line comment mode");
     BEGIN 0;
 }
 
@@ -112,13 +117,13 @@ identifiers         [a-zA-z_][a-zA-Z0-9_]*
 
 "//" /* begin line comment */ {
     pushToLine(yytext);
-    info << "enter line comment mode" << std::endl;
+    info("enter line comment mode");
     BEGIN LINE_COMMENT;
 }
 
 "/*" /* begin block comment */ {
     pushToLine(yytext);
-    info << "enter block comment mode" << std::endl;
+    info("enter block comment mode");
     BEGIN BLOCK_COMMENT;
 }
 
@@ -132,27 +137,27 @@ identifiers         [a-zA-z_][a-zA-Z0-9_]*
     printToken(Token::CHAR, yytext);
 }
 
-^#pragma[ \t]+source[ \t]+on$ /* #pragma source on */ {
+^[ \t]*#pragma[ \t]+source[ \t]+on$ /* #pragma source on */ {
     pushToLine(yytext);
-    info << "set pragma source on" << std::endl;
+    info("set pragma source on");
     source_on = true;
 }
 
-^#pragma[ \t]+source[ \t]+off$ /* #pragma source off */ {
+^#[ \t]*pragma[ \t]+source[ \t]+off$ /* #pragma source off */ {
     pushToLine(yytext);
-    info << "set pragma source off" << std::endl;
+    info("set pragma source off");
     source_on = false;
 }
 
-^#pragma[ \t]+token[ \t]+on$ /* #pragma token on */ {
+^#[ \t]*pragma[ \t]+token[ \t]+on$ /* #pragma token on */ {
     pushToLine(yytext);
-    info << "set pragma token on" << std::endl;
+    info("set pragma token on");
     token_on = true;
 }
 
-^#pragma[ \t]+token[ \t]+off$ /* #pragma token off */ {
+^#[ \t]*pragma[ \t]+token[ \t]+off$ /* #pragma token off */ {
     pushToLine(yytext);
-    info << "set pragma token off" << std::endl;
+    info("set pragma token off");
     token_on = false;
 }
 
