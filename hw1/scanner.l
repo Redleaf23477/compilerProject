@@ -52,7 +52,7 @@ sigma               [\x20-\x7e]
 special_char        [\\'"]
     /*escape_seq          \\[\\'"0tn]*/
 escape_seq          \\.
-c_char              ([\x20-\x7e]{-}[\\'"])|(\\.)
+c_char              ([\x20-\x7e]{-}[\\'"])|(\\.)|(\\[0-7]{1,3})|(\\x[a-fA-F0-9]+)|(\\u[a-fA-F0-9]{4})|(\\U[a-fA-F0-9]{8})
 operators           \+|-|\*|\/|%|\+\+|--|<|<=|>|>=|==|!=|=|&&|\|\||!|&|\|
 punctuations        :|;|,|\.|\[|\]|\(|\)|\{|\}
 keywords            for|do|while|break|continue|if|else|return|struct|switch|case|default|void|int|double|float|char|const|signed|unsigned|short|long
@@ -129,13 +129,13 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
     BEGIN BLOCK_COMMENT;
 }
 
-\"{c_char}*\" /* string literals */ {
+\"({c_char}|\')*\" /* string literals */ {
     info("consume string literal");
     pushToLine(yytext);
     printToken(Token::STR, yytext);
 }
 
-\'{c_char}\' /* char literals */ {
+\'({c_char}|\")\' /* char literals */ {
     info("consume char literal");
     pushToLine(yytext);
     printToken(Token::CHAR, yytext);
