@@ -1,10 +1,13 @@
 %{
     #include <iostream>
     #include <string>
+    #include <iomanip>
 
     #ifdef DEV
-    #define info(x) do { std::cerr << "[P:INFO]" << x << std::endl; } while (0)
+    #define report(TYPE) info("consume " << #TYPE << " " << yylval); return TYPE
+    #define info(x) do { std::cerr << "[S:INFO] " << x << std::endl; } while (0)
     #else
+    #define report(TYPE) return TYPE
     #define info(x) do {} while (0)
     #endif
 
@@ -21,10 +24,6 @@ special_char        [\\'"]
     /*escape_seq          \\[\\'"0tn]*/
 escape_seq          \\.
 c_char              ([\x20-\x7e]{-}[\\'"])|(\\.)|(\\[0-7]{1,3})|(\\x[a-fA-F0-9]+)|(\\u[a-fA-F0-9]{4})|(\\U[a-fA-F0-9]{8})
-operators           \+|-|\*|\/|%|\+\+|--|<|<=|>|>=|==|!=|=|&&|\|\||!|&|\|
-punctuations        :|;|,|\.|\[|\]|\(|\)|\{|\}
-keywords            for|do|while|break|continue|if|else|return|struct|switch|case|default|void|int|double|float|char|const|signed|unsigned|short|long
-macros              NULL|__COUNTER__|__LINE__|INT_MAX|INT_MIN|CHAR_MAX|CHAR_MIN|MAX|MIN
 identifiers         [a-zA-Z_][a-zA-Z0-9_]*
 
 %x LINE_COMMENT
@@ -41,9 +40,11 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
 <LINE_COMMENT>\n {
     info("exit line comment mode");
     BEGIN 0;
+    // return nothong
 }
 
 <LINE_COMMENT>. {
+    // return nothong
 }
 
     /**********************************
@@ -52,15 +53,19 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
+    /*
 <BLOCK_COMMENT>\n {
 }
+    */
 
 <BLOCK_COMMENT>"*/" {
     info("exit line comment mode");
     BEGIN 0;
+    // return nothong
 }
 
 <BLOCK_COMMENT>. {
+    // return nothong
 }
 
     /**********************************
@@ -69,9 +74,11 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
+    /*
 \n  { 
     info("consume new line");
 }
+    */
 
 "//" /* begin line comment */ {
     info("enter line comment mode");
@@ -83,81 +90,132 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
     BEGIN BLOCK_COMMENT;
 }
 
+    /**********************************
+     *
+     * Literals
+     *
+     **********************************/
+
 \"({c_char}|\')*\" /* string literals */ {
-    info("consume string literal");
-//  printToken(Token::STR, yytext);
+    yylval = yytext;
+    report(LITERAL);
 }
 
 \'({c_char}|\")\' /* char literals */ {
-    info("consume char literal");
-//  printToken(Token::CHAR, yytext);
-}
-
-^[ \t]*#pragma[ \t]+source[ \t]+on$ /* #pragma source on */ {
-    info("set pragma source on");
-}
-
-^[ \t]*#pragma[ \t]+source[ \t]+off$ /* #pragma source off */ {
-    info("set pragma source off");
-}
-
-^[ \t]*#pragma[ \t]+token[ \t]+on$ /* #pragma token on */ {
-    info("set pragma token on");
-}
-
-^[ \t]*#pragma[ \t]+token[ \t]+off$ /* #pragma token off */ {
-    info("set pragma token off");
-}
-
-[\+-]?[0-9]+\.[0-9]* /* float point literal case1: (sign)x. */ {
-    info("consume float point literal");
-//  printToken(Token::FP, yytext);
-}
-
-[\+-]?[0-9]*\.[0-9]+ /* float point literal case2: (sign).x */ {
-    info("consume float point literal");
-//  printToken(Token::FP, yytext);
-}
-
-[\+-]?[0-9]+ /* int literal */ {
-    info("consume int literal");
-//  printToken(Token::INT, yytext);
-}
-
-{operators} {
-    info("consume operator");
-//  printToken(Token::OP, yytext);
-}
-
-{punctuations} {
-    info("consume puncuation");
-//  printToken(Token::PUNC, yytext);
     yylval = yytext;
-    return ';';
+    report(LITERAL);
 }
 
-{keywords} {
-    info("consume keywords");
-//  printToken(Token::KEY, yytext);
-    // Dirty quick fix
-    yylval = yytext;
-    return INT;
+    /* TO TEST */
+([0-9]*\.[0-9]+)|([0-9]+\.[0-9]*) /* signless loat point literal,  case2: .x , case1: x.*/ {
+    double n = atof(yytext);
+    char buff[1000]; sprintf(buff, "%f", n);
+    yylval = buff;
+    report(LITERAL);
 }
 
-{macros} {
-    info("consume macro");
-//  printToken(Token::MACRO, yytext);
+[0-9]+ /* signless int literal */ {
+    int n = atoi(yytext);
+    char buff[1000]; sprintf(buff, "%d", n);
+    yylval = buff;
+    report(LITERAL);
 }
 
-{identifiers} {
-    info("consume id");
-//  printToken(Token::ID, yytext);
-    yylval = yytext;
-    return IDENTIFIER;
-}
+    /**********************************
+     *
+     * Operators
+     *
+     **********************************/
+
+"++"    { yylval = yytext; report(INC_OP); }
+"--"    { yylval = yytext; report(DEC_OP); }
+"<="    { yylval = yytext; report(LEQ_OP); }
+">="    { yylval = yytext; report(GEQ_OP); }
+"=="    { yylval = yytext; report(EQ_OP); }
+"!="    { yylval = yytext; report(NEQ_OP); }
+">>"    { yylval = yytext; report(RSHIFT_OP); }
+"<<"    { yylval = yytext; report(LSHIFT_OP); }
+"&&"    { yylval = yytext; report(LAND_OP); }
+"||"    { yylval = yytext; report(LOR_OP); }
+"+"     { yylval = yytext; report('+'); }
+"-"     { yylval = yytext; report('-'); }
+"*"     { yylval = yytext; report('*'); }
+"/"     { yylval = yytext; report('/'); }
+"%"     { yylval = yytext; report('%'); }
+"<"     { yylval = yytext; report('<'); }
+">"     { yylval = yytext; report('>'); }
+"="     { yylval = yytext; report('='); }
+"!"     { yylval = yytext; report('!'); }
+"~"     { yylval = yytext; report('~'); }
+"^"     { yylval = yytext; report('^'); }
+"&"     { yylval = yytext; report('&'); }
+"|"     { yylval = yytext; report('|'); }
+"["     { yylval = yytext; report('['); }
+"]"     { yylval = yytext; report(']'); }
+"("     { yylval = yytext; report('('); }
+")"     { yylval = yytext; report(')'); }
+
+    /**********************************
+     *
+     * Punctuations
+     *
+     **********************************/
+
+";"     { yylval = yytext; report(';'); }
+":"     { yylval = yytext; report(':'); }
+","     { yylval = yytext; report(','); }
+"{"     { yylval = yytext; report('{'); }
+"}"     { yylval = yytext; report('}'); }
+
+    /**********************************
+     *
+     * Key words
+     *
+     **********************************/
+
+"const"     { yylval = yytext; report(CONST); }
+
+"int"       { yylval = yytext; report(INT); }
+"char"      { yylval = yytext; report(CHAR); }
+"float"     { yylval = yytext; report(FLOAT); }
+"double"    { yylval = yytext; report(DOUBLE); }
+"void"      { yylval = yytext; report(VOID); }
+"signed"    { yylval = yytext; report(SIGNED); }
+"unsigned"  { yylval = yytext; report(UNSIGNED); }
+"long"      { yylval = yytext; report(LONG); }
+"short"     { yylval = yytext; report(SHORT); }
+
+"if"        { yylval = yytext; report(IF); }
+"else"      { yylval = yytext; report(ELSE); }
+"switch"    { yylval = yytext; report(SWITCH); }
+"case"      { yylval = yytext; report(CASE); }
+"default"   { yylval = yytext; report(DEFAULT); }
+"while"     { yylval = yytext; report(WHILE); }
+"do"        { yylval = yytext; report(DO); }
+"for"       { yylval = yytext; report(FOR); }
+"return"    { yylval = yytext; report(RETURN); }
+"break"     { yylval = yytext; report(BREAK); }
+"continue"  { yylval = yytext; report(CONTINUE); }
+
+"NULL"      { yylval = "0"; report(NUL); }
+
+    /**********************************
+     *
+     * Identifier
+     *
+     **********************************/
+
+{identifiers}   { yylval = yytext; report(IDENTIFIER); }
+
+    /**********************************
+     *
+     * Defaults
+     *
+     **********************************/
 
 . /* not matching any rule */ {
-    info("consume an unmatched char");
+    info("consume an unmatched char '" << yytext << "'");
+    // return nothong
 }
 
 %% 
