@@ -129,15 +129,24 @@ declarator
 // declare the name of variable
 direct_declarator
     : IDENTIFIER 
+    | direct_declarator '[' LITERAL ']'  // TODO: wait until expr impl.
     ;
 
 // const pointer to type will not happen
 pointer
     : '*'                           // e.g. int *ptr
+    ;
 
 // TODO: wait until expr impl.
 initializer
     : LITERAL
+    | '{' initializer_list '}'
+    ;
+
+initializer_list
+    : initializer
+    | initializer ',' initializer_list
+    ;
 %%
 
 int main(void) {
