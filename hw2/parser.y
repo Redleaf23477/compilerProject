@@ -129,7 +129,19 @@ declarator
 // declare the name of variable
 direct_declarator
     : IDENTIFIER 
+    | IDENTIFIER '(' ')'                    // function with no parameters
+    | IDENTIFIER '(' parameter_list ')'
     | direct_declarator '[' LITERAL ']'  // TODO: wait until expr impl.
+    ;
+
+// grammar of parameter list
+parameter_list
+    : parameter_declaration
+    | parameter_declaration ',' parameter_list
+    ;
+
+parameter_declaration
+    : declaration_specifiers declarator     // TYPE id
     ;
 
 // const pointer to type will not happen
