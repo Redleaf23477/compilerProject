@@ -139,7 +139,19 @@ prefix_expression
     : unary_operation_expression
     | INC_OP unary_operation_expression
     | DEC_OP unary_operation_expression
-    | '(' declaration_specifiers ')' unary_operation_expression     // TODO: rewrite type case
+    | '(' type_name ')' unary_operation_expression
+    ;
+
+type_name
+    : specifier_qualifier_list
+    | specifier_qualifier_list pointer
+    ;
+
+specifier_qualifier_list
+    : type_qualifier
+    | type_qualifier specifier_qualifier_list
+    | type_specifier
+    | type_specifier specifier_qualifier_list
     ;
 
     /* Left precedence (Left to Right) */
