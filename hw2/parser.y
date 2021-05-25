@@ -275,7 +275,7 @@ direct_declarator
     : IDENTIFIER 
     | IDENTIFIER '(' ')'                    // function with no parameters
     | IDENTIFIER '(' parameter_list ')'
-    | direct_declarator '[' LITERAL ']'  // TODO: wait until expr impl.
+    | direct_declarator '[' expression ']' 
     ;
 
 // grammar of parameter list
@@ -293,9 +293,8 @@ pointer
     : '*'                           // e.g. int *ptr
     ;
 
-// TODO: wait until expr impl.
 initializer
-    : LITERAL
+    : expression 
     | '{' initializer_list '}'
     ;
 
