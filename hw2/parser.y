@@ -60,6 +60,19 @@ inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
 // operators
 %token INC_OP DEC_OP LEQ_OP GEQ_OP EQ_OP NEQ_OP RSHIFT_OP LSHIFT_OP LAND_OP LOR_OP
 
+// binary operator precedence
+%right '='
+%left LOR_OP
+%left LAND_OP
+%left '|'
+%left '^'
+%left '&'
+%left EQ_OP NEQ_OP
+%left '>' GEQ_OP '<' LEQ_OP
+%left LSHIFT_OP RSHIFT_OP
+%left '+' '-'
+%left '*' '/' '%'
+
 // type qualifiter
 %token CONST
 
@@ -71,11 +84,141 @@ inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
 
 %token NUL
 
+%start translation_unit
+
 %%
+
+// entry point for parsing
+translation_unit
+    : external_declaration
+    | translation_unit external_declaration
+    ;
+
+external_declaration
+    : declaration               // e.g. global variables
+    | expression ';' // TODO: delete me, just for testing
+//    | function_definition       // e.g. int main() { ... }
+    ;
 
 /**********************************
  *
- * Scalar Declaration
+ * Expression (Listed from high to low precedence)
+ *
+ **********************************/
+
+// highest precedence, should not be separated
+primary_expression
+    : IDENTIFIER
+    | LITERAL
+    | '(' expression ')'
+    ;
+
+    /* Right precedence (Right to Left) */
+
+suffix_expression
+    : primary_expression
+    | suffix_expression INC_OP
+    | suffix_expression DEC_OP
+    ;
+
+unary_operation_expression
+    : suffix_expression
+    | unary_operator suffix_expression
+    ;
+
+unary_operator
+    : '&'
+    | '*'
+    | '!'
+    | '~'
+    | '+'
+    | '-'
+    ;
+
+prefix_expression
+    : unary_operation_expression
+    | INC_OP unary_operation_expression
+    | DEC_OP unary_operation_expression
+    | '(' declaration_specifiers ')' unary_operation_expression     // TODO: rewrite type case
+    ;
+
+    /* Left precedence (Left to Right) */
+
+multiplicative_expression
+    : prefix_expression
+    | multiplicative_expression '*' prefix_expression
+    | multiplicative_expression '/' prefix_expression
+    | multiplicative_expression '%' prefix_expression
+    ;
+
+additive_expression
+    : multiplicative_expression
+    | additive_expression '+' multiplicative_expression
+    | additive_expression '-' multiplicative_expression
+    ;
+
+shift_expression
+    : additive_expression
+    | shift_expression LSHIFT_OP additive_expression
+    | shift_expression RSHIFT_OP additive_expression
+    ;
+
+relational_expression
+    : shift_expression
+    | relational_expression '<' shift_expression
+    | relational_expression LEQ_OP shift_expression
+    | relational_expression '>' shift_expression
+    | relational_expression GEQ_OP shift_expression
+    ;
+
+equality_expression
+    : relational_expression
+    | equality_expression EQ_OP relational_expression
+    | equality_expression NEQ_OP relational_expression
+    ;
+
+bitwise_and_expression
+    : equality_expression
+    | bitwise_and_expression '&' equality_expression
+    ;
+
+bitwise_xor_expression
+    : bitwise_and_expression
+    | bitwise_xor_expression '^' bitwise_and_expression
+    ;
+
+bitwise_or_expression
+    : bitwise_xor_expression
+    | bitwise_or_expression '|' bitwise_xor_expression
+    ;
+
+logical_and_expression
+    : bitwise_or_expression
+    | logical_and_expression LAND_OP bitwise_or_expression
+    ;
+
+logical_or_expression
+    : logical_and_expression
+    | logical_or_expression LOR_OP logical_and_expression
+    ;
+
+
+    /* Right precedence (Right to Left) */
+
+assignment_expression
+    : logical_or_expression
+    | logical_or_expression '=' assignment_expression
+    ;
+
+// lowest precedence, includes everything
+// comma not supported
+expression
+    : assignment_expression
+    ;
+
+/**********************************
+ *
+ * Declarations: scalar, array, function
  *
  **********************************/
 
@@ -107,6 +250,7 @@ type_specifier
 // terminals: type qualifiers
 type_qualifier
     : CONST
+    ;
 
 // grammar describing a set of declaraed name (and possibly initialization)
 init_declarator_list
@@ -144,7 +288,7 @@ parameter_declaration
     : declaration_specifiers declarator     // TYPE id
     ;
 
-// const pointer to type will not happen
+// terminal: pointer (only supports single level pointer)
 pointer
     : '*'                           // e.g. int *ptr
     ;
@@ -159,6 +303,15 @@ initializer_list
     : initializer
     | initializer ',' initializer_list
     ;
+
+/**********************************
+ *
+ * Function Definition
+ *
+ **********************************/
+
+// TODO: wait until stmt impl.
+
 %%
 
 int main(void) {

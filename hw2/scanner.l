@@ -92,6 +92,28 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
 
     /**********************************
      *
+     * Pragma
+     *
+     **********************************/
+
+^[ \t]*#pragma[ \t]+source[ \t]+on$ /* #pragma source on */ {
+    // do nothing
+}
+
+^[ \t]*#pragma[ \t]+source[ \t]+off$ /* #pragma source off */ {
+    // do nothing
+}
+
+^[ \t]*#pragma[ \t]+token[ \t]+on$ /* #pragma token on */ {
+    // do nothing
+}
+
+^[ \t]*#pragma[ \t]+token[ \t]+off$ /* #pragma token off */ {
+    // do nothing
+}
+
+    /**********************************
+     *
      * Literals
      *
      **********************************/
