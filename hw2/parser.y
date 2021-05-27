@@ -18,7 +18,7 @@ extern "C" {
 }
 
 // yylval Type Definition
-#define YYSTYPE std::string
+#include "yystype.h"
 
 // usefull helper functions
 
@@ -96,8 +96,122 @@ translation_unit
 
 external_declaration
     : declaration               // e.g. global variables
-    | expression ';' // TODO: delete me, just for testing
-//    | function_definition       // e.g. int main() { ... }
+    | statement
+    | function_definition       // e.g. int main() { ... }
+    ;
+
+/**********************************
+ *
+ * Function definition
+ *
+ **********************************/
+
+function_definition
+    : declaration_specifiers declarator compound_statement
+    ;
+
+/**********************************
+ *
+ * Statement
+ *
+ **********************************/
+
+statement
+    : expression_statement
+    | selection_statement
+    | iteration_statement
+    | jump_statement
+    | compound_statement
+    ;
+
+expression_statement
+    : expression ';'
+    ;
+
+selection_statement
+    : if_statement
+    | switch_statement
+    ;
+
+if_statement
+    : IF '(' expression ')' compound_statement
+    | IF '(' expression ')' compound_statement ELSE compound_statement
+    ;
+
+switch_statement
+    : SWITCH '(' expression ')' '{' '}'                     // no switch clause
+    | SWITCH '(' expression ')' '{' switch_clause_list '}'  // 1 or more switch clause
+    ;
+
+switch_clause_list
+    : switch_clause
+    | switch_clause switch_clause_list 
+    ;
+
+switch_clause
+    : CASE expression ':' 
+    | CASE expression ':' statement_list
+    | DEFAULT ':'
+    | DEFAULT ':' statement_list
+    ;
+
+statement_list
+    : statement
+    | statement statement_list
+    ;
+
+iteration_statement
+    : while_statement
+    | do_while_statement
+    | for_statement
+    ;
+
+while_statement
+    : WHILE '(' expression ')' statement
+    ;
+
+do_while_statement
+    : DO statement WHILE '(' expression ')' ';'
+    ;
+
+for_statement
+    : FOR '(' emptiable_expression ';' emptiable_expression ';' emptiable_expression ')' statement
+    ;
+
+emptiable_expression
+    : /* empty */
+    | expression
+    ;
+
+jump_statement
+    : break_statement
+    | continue_statement
+    | return_statement
+    ;
+
+break_statement
+    : BREAK ';'
+    ;
+
+continue_statement
+    : CONTINUE ';'
+    ;
+
+return_statement
+    : RETURN ';'
+    | RETURN expression ';'
+    ;
+
+compound_statement
+    : '{' '}'
+    | '{' statement_declaration_list '}'
+    ;
+
+statement_declaration_list
+    : statement
+    | statement statement_declaration_list
+    | declaration
+    | declaration statement_declaration_list
     ;
 
 /**********************************
@@ -314,14 +428,6 @@ initializer_list
     : initializer
     | initializer ',' initializer_list
     ;
-
-/**********************************
- *
- * Function Definition
- *
- **********************************/
-
-// TODO: wait until stmt impl.
 
 %%
 
