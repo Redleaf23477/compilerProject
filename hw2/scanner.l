@@ -3,7 +3,7 @@
     #include <iomanip>
 
     #ifdef DEV
-    #define report(TYPE) info("consume " << #TYPE << " " << yylval); return TYPE
+    #define report(TYPE) info("consume " << #TYPE << " " << yylval->token); return TYPE
     #define info(x) do { std::cerr << "[S:INFO] " << x << std::endl; } while (0)
     #else
     #define report(TYPE) return TYPE
@@ -120,12 +120,12 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      **********************************/
 
 \"({c_char}|\')*\" /* string literals */ {
-    yylval = yytext;
+    yylval = new Node(yytext);
     report(LITERAL);
 }
 
 \'({c_char}|\")\' /* char literals */ {
-    yylval = yytext;
+    yylval = new Node(yytext);
     report(LITERAL);
 }
 
@@ -133,14 +133,14 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
 ([0-9]*\.[0-9]+)|([0-9]+\.[0-9]*) /* signless loat point literal,  case2: .x , case1: x.*/ {
     double n = atof(yytext);
     char buff[1000]; sprintf(buff, "%f", n);
-    yylval = buff;
+    yylval = new Node(buff);
     report(LITERAL);
 }
 
 [0-9]+ /* signless int literal */ {
     int n = atoi(yytext);
     char buff[1000]; sprintf(buff, "%d", n);
-    yylval = buff;
+    yylval = new Node(buff);
     report(LITERAL);
 }
 
@@ -150,33 +150,33 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
-"++"    { yylval = yytext; report(INC_OP); }
-"--"    { yylval = yytext; report(DEC_OP); }
-"<="    { yylval = yytext; report(LEQ_OP); }
-">="    { yylval = yytext; report(GEQ_OP); }
-"=="    { yylval = yytext; report(EQ_OP); }
-"!="    { yylval = yytext; report(NEQ_OP); }
-">>"    { yylval = yytext; report(RSHIFT_OP); }
-"<<"    { yylval = yytext; report(LSHIFT_OP); }
-"&&"    { yylval = yytext; report(LAND_OP); }
-"||"    { yylval = yytext; report(LOR_OP); }
-"+"     { yylval = yytext; report('+'); }
-"-"     { yylval = yytext; report('-'); }
-"*"     { yylval = yytext; report('*'); }
-"/"     { yylval = yytext; report('/'); }
-"%"     { yylval = yytext; report('%'); }
-"<"     { yylval = yytext; report('<'); }
-">"     { yylval = yytext; report('>'); }
-"="     { yylval = yytext; report('='); }
-"!"     { yylval = yytext; report('!'); }
-"~"     { yylval = yytext; report('~'); }
-"^"     { yylval = yytext; report('^'); }
-"&"     { yylval = yytext; report('&'); }
-"|"     { yylval = yytext; report('|'); }
-"["     { yylval = yytext; report('['); }
-"]"     { yylval = yytext; report(']'); }
-"("     { yylval = yytext; report('('); }
-")"     { yylval = yytext; report(')'); }
+"++"    { yylval = new Node(yytext); report(INC_OP); }
+"--"    { yylval = new Node(yytext); report(DEC_OP); }
+"<="    { yylval = new Node(yytext); report(LEQ_OP); }
+">="    { yylval = new Node(yytext); report(GEQ_OP); }
+"=="    { yylval = new Node(yytext); report(EQ_OP); }
+"!="    { yylval = new Node(yytext); report(NEQ_OP); }
+">>"    { yylval = new Node(yytext); report(RSHIFT_OP); }
+"<<"    { yylval = new Node(yytext); report(LSHIFT_OP); }
+"&&"    { yylval = new Node(yytext); report(LAND_OP); }
+"||"    { yylval = new Node(yytext); report(LOR_OP); }
+"+"     { yylval = new Node(yytext); report('+'); }
+"-"     { yylval = new Node(yytext); report('-'); }
+"*"     { yylval = new Node(yytext); report('*'); }
+"/"     { yylval = new Node(yytext); report('/'); }
+"%"     { yylval = new Node(yytext); report('%'); }
+"<"     { yylval = new Node(yytext); report('<'); }
+">"     { yylval = new Node(yytext); report('>'); }
+"="     { yylval = new Node(yytext); report('='); }
+"!"     { yylval = new Node(yytext); report('!'); }
+"~"     { yylval = new Node(yytext); report('~'); }
+"^"     { yylval = new Node(yytext); report('^'); }
+"&"     { yylval = new Node(yytext); report('&'); }
+"|"     { yylval = new Node(yytext); report('|'); }
+"["     { yylval = new Node(yytext); report('['); }
+"]"     { yylval = new Node(yytext); report(']'); }
+"("     { yylval = new Node(yytext); report('('); }
+")"     { yylval = new Node(yytext); report(')'); }
 
     /**********************************
      *
@@ -184,11 +184,11 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
-";"     { yylval = yytext; report(';'); }
-":"     { yylval = yytext; report(':'); }
-","     { yylval = yytext; report(','); }
-"{"     { yylval = yytext; report('{'); }
-"}"     { yylval = yytext; report('}'); }
+";"     { yylval = new Node(yytext); report(';'); }
+":"     { yylval = new Node(yytext); report(':'); }
+","     { yylval = new Node(yytext); report(','); }
+"{"     { yylval = new Node(yytext); report('{'); }
+"}"     { yylval = new Node(yytext); report('}'); }
 
     /**********************************
      *
@@ -196,31 +196,35 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
-"const"     { yylval = yytext; report(CONST); }
+"const"     { yylval = new Node(yytext); report(CONST); }
 
-"int"       { yylval = yytext; report(INT); }
-"char"      { yylval = yytext; report(CHAR); }
-"float"     { yylval = yytext; report(FLOAT); }
-"double"    { yylval = yytext; report(DOUBLE); }
-"void"      { yylval = yytext; report(VOID); }
-"signed"    { yylval = yytext; report(SIGNED); }
-"unsigned"  { yylval = yytext; report(UNSIGNED); }
-"long"      { yylval = yytext; report(LONG); }
-"short"     { yylval = yytext; report(SHORT); }
+"int"       { yylval = new Node(yytext); report(INT); }
+"char"      { yylval = new Node(yytext); report(CHAR); }
+"float"     { yylval = new Node(yytext); report(FLOAT); }
+"double"    { yylval = new Node(yytext); report(DOUBLE); }
+"void"      { yylval = new Node(yytext); report(VOID); }
+"signed"    { yylval = new Node(yytext); report(SIGNED); }
+"unsigned"  { yylval = new Node(yytext); report(UNSIGNED); }
+"long"      { yylval = new Node(yytext); report(LONG); }
+"short"     { yylval = new Node(yytext); report(SHORT); }
 
-"if"        { yylval = yytext; report(IF); }
-"else"      { yylval = yytext; report(ELSE); }
-"switch"    { yylval = yytext; report(SWITCH); }
-"case"      { yylval = yytext; report(CASE); }
-"default"   { yylval = yytext; report(DEFAULT); }
-"while"     { yylval = yytext; report(WHILE); }
-"do"        { yylval = yytext; report(DO); }
-"for"       { yylval = yytext; report(FOR); }
-"return"    { yylval = yytext; report(RETURN); }
-"break"     { yylval = yytext; report(BREAK); }
-"continue"  { yylval = yytext; report(CONTINUE); }
+"if"        { yylval = new Node(yytext); report(IF); }
+"else"      { yylval = new Node(yytext); report(ELSE); }
+"switch"    { yylval = new Node(yytext); report(SWITCH); }
+"case"      { yylval = new Node(yytext); report(CASE); }
+"default"   { yylval = new Node(yytext); report(DEFAULT); }
+"while"     { yylval = new Node(yytext); report(WHILE); }
+"do"        { yylval = new Node(yytext); report(DO); }
+"for"       { yylval = new Node(yytext); report(FOR); }
+"return"    { yylval = new Node(yytext); report(RETURN); }
+"break"     { yylval = new Node(yytext); report(BREAK); }
+"continue"  { yylval = new Node(yytext); report(CONTINUE); }
 
-"NULL"      { yylval = "0"; report(NUL); }
+"NULL"      { 
+    char buff[2] = "0";
+    yylval = new Node(buff); 
+    report(NUL); 
+}
 
     /**********************************
      *
@@ -228,7 +232,7 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
-{identifiers}   { yylval = yytext; report(IDENTIFIER); }
+{identifiers}   { yylval = new Node(yytext); report(IDENTIFIER); }
 
     /**********************************
      *

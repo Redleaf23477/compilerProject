@@ -4,6 +4,7 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include <initializer_list>
 
 #ifdef DEV
 #define info(x) do { std::cerr << "[P:INFO] " << x << std::endl; } while (0)
@@ -22,26 +23,25 @@ extern "C" {
 
 // usefull helper functions
 
-enum Tag {
-    SDEC,  // scalar declaration
-    ADEC,  // array declaration
-    FDEC,  // function declaration
-    FDEF,  // function definition
-    EXPR,  // expr
-    STMT   // stmt
-};
-
-inline std::string tag2str(Tag t) {
-    switch (t) {
-    case SDEC: return "scalar_decl";
-    case ADEC: return "array_decl";
-    case FDEC: return "func_decl";
-    case FDEF: return "func_def";
-    case EXPR: return "expr";
-    case STMT: return "stmt";
-    default: info("unknown tag " << t); assert(false && "unreachable"); return "unknown";
+void set(YYSTYPE &dest, Tag t, std::initializer_list<YYSTYPE> child_list) {
+    dest = new Node;
+    dest->tag = t;
+    size_t i = 0;
+    for (auto c : child_list) {
+        dest->child[i++] = c;
     }
+#ifdef DEV
+    for (size_t j = 0; j < i; j++) {
+        info("c[" << j << "]=(" << (dest->child[j]->token? dest->child[j]->token : "X") << "," << tag2str(dest->child[j]->tag) << ")");
+    }
+#endif
 }
+
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1) { set(dest, t, { _1 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2) { set(dest, t, { _1, _2 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3) { set(dest, t, { _1, _2, _3 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4) { set(dest, t, { _1, _2, _3, _4 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5) { set(dest, t, { _1, _2, _3, _4, _5 } ); }
 
 inline void BEG(Tag t) { std::cout << "<" << tag2str(t) << ">"; }
 inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
@@ -222,22 +222,22 @@ statement_declaration_list
 
 // highest precedence, should not be separated
 primary_expression
-    : IDENTIFIER
-    | LITERAL
-    | '(' expression ')'
+    : IDENTIFIER            { set($$, EXPR, $1); }
+    | LITERAL               { set($$, EXPR, $1); }
+    | '(' expression ')'    { set($$, EXPR, $1, $2, $3); }
     ;
 
     /* Right precedence (Right to Left) */
 
 suffix_expression
     : primary_expression
-    | suffix_expression INC_OP
-    | suffix_expression DEC_OP
+    | suffix_expression INC_OP { set($$, EXPR, $1, $2); }
+    | suffix_expression DEC_OP { set($$, EXPR, $1, $2); }
     ;
 
 unary_operation_expression
     : suffix_expression
-    | unary_operator suffix_expression
+    | unary_operator suffix_expression { set($$, EXPR, $1, $2); }
     ;
 
 unary_operator
@@ -251,9 +251,9 @@ unary_operator
 
 prefix_expression
     : unary_operation_expression
-    | INC_OP unary_operation_expression
-    | DEC_OP unary_operation_expression
-    | '(' type_name ')' unary_operation_expression
+    | INC_OP unary_operation_expression             { set($$, EXPR, $1, $2); }
+    | DEC_OP unary_operation_expression             { set($$, EXPR, $1, $2); }
+    | '(' type_name ')' unary_operation_expression  { set($$, EXPR, $1, $2, $3, $4); }
     ;
 
 type_name
@@ -272,60 +272,60 @@ specifier_qualifier_list
 
 multiplicative_expression
     : prefix_expression
-    | multiplicative_expression '*' prefix_expression
-    | multiplicative_expression '/' prefix_expression
-    | multiplicative_expression '%' prefix_expression
+    | multiplicative_expression '*' prefix_expression { set($$, EXPR, $1, $2, $3); }
+    | multiplicative_expression '/' prefix_expression { set($$, EXPR, $1, $2, $3); }
+    | multiplicative_expression '%' prefix_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 additive_expression
     : multiplicative_expression
-    | additive_expression '+' multiplicative_expression
-    | additive_expression '-' multiplicative_expression
+    | additive_expression '+' multiplicative_expression { set($$, EXPR, $1, $2, $3); }
+    | additive_expression '-' multiplicative_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 shift_expression
     : additive_expression
-    | shift_expression LSHIFT_OP additive_expression
-    | shift_expression RSHIFT_OP additive_expression
+    | shift_expression LSHIFT_OP additive_expression { set($$, EXPR, $1, $2, $3); }
+    | shift_expression RSHIFT_OP additive_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 relational_expression
     : shift_expression
-    | relational_expression '<' shift_expression
-    | relational_expression LEQ_OP shift_expression
-    | relational_expression '>' shift_expression
-    | relational_expression GEQ_OP shift_expression
+    | relational_expression '<' shift_expression { set($$, EXPR, $1, $2, $3); }
+    | relational_expression LEQ_OP shift_expression { set($$, EXPR, $1, $2, $3); }
+    | relational_expression '>' shift_expression { set($$, EXPR, $1, $2, $3); }
+    | relational_expression GEQ_OP shift_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 equality_expression
     : relational_expression
-    | equality_expression EQ_OP relational_expression
-    | equality_expression NEQ_OP relational_expression
+    | equality_expression EQ_OP relational_expression { set($$, EXPR, $1, $2, $3); }
+    | equality_expression NEQ_OP relational_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 bitwise_and_expression
     : equality_expression
-    | bitwise_and_expression '&' equality_expression
+    | bitwise_and_expression '&' equality_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 bitwise_xor_expression
     : bitwise_and_expression
-    | bitwise_xor_expression '^' bitwise_and_expression
+    | bitwise_xor_expression '^' bitwise_and_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 bitwise_or_expression
     : bitwise_xor_expression
-    | bitwise_or_expression '|' bitwise_xor_expression
+    | bitwise_or_expression '|' bitwise_xor_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 logical_and_expression
     : bitwise_or_expression
-    | logical_and_expression LAND_OP bitwise_or_expression
+    | logical_and_expression LAND_OP bitwise_or_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 logical_or_expression
     : logical_and_expression
-    | logical_or_expression LOR_OP logical_and_expression
+    | logical_or_expression LOR_OP logical_and_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 
@@ -333,7 +333,7 @@ logical_or_expression
 
 assignment_expression
     : logical_or_expression
-    | logical_or_expression '=' assignment_expression
+    | logical_or_expression '=' assignment_expression { set($$, EXPR, $1, $2, $3); }
     ;
 
 // lowest precedence, includes everything
