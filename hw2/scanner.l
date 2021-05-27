@@ -1,6 +1,5 @@
 %{
     #include <iostream>
-    #include <string>
     #include <iomanip>
 
     #ifdef DEV
@@ -12,10 +11,12 @@
     #endif
 
     #include "y.tab.h"
+    #include "yystype.h"
 
     extern "C" int yylex();
 
-    extern std::string yylval;
+    // extern std::string yylval;
+    extern YYSTYPE yylval;
 
 %}
 
