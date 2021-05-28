@@ -25,6 +25,7 @@ struct Node {
 
     Node();
     Node(char*);    // construct from yytext
+    ~Node();
 };
 
 std::ostream& operator << (std::ostream&, Node&);

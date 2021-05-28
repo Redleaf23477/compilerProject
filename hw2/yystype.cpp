@@ -31,6 +31,10 @@ Node::Node(char *yytext):token(NULL), tag(NOTAG) {
     memset(child, 0, sizeof(child));
 }
 
+Node::~Node() {
+    if (token != NULL) delete[] token;
+}
+
 std::ostream &operator << (std::ostream &out, Node &nd) {
     if (nd.token != NULL) {
         out << nd.token;

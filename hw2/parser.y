@@ -46,6 +46,8 @@ void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, Y
 inline void BEG(Tag t) { std::cout << "<" << tag2str(t) << ">"; }
 inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
 
+void print_and_bye(YYSTYPE);
+
 %}
 
 /**********************************
@@ -117,7 +119,7 @@ function_definition
  **********************************/
 
 statement
-    : expression_statement
+    : expression_statement { print_and_bye($1); $$ = NULL; }
     | selection_statement
     | iteration_statement
     | jump_statement
@@ -125,7 +127,7 @@ statement
     ;
 
 expression_statement
-    : expression ';'
+    : expression ';' { set($$, STMT, $1, $2); }
     ;
 
 selection_statement
@@ -291,16 +293,16 @@ shift_expression
 
 relational_expression
     : shift_expression
-    | relational_expression '<' shift_expression { set($$, EXPR, $1, $2, $3); }
-    | relational_expression LEQ_OP shift_expression { set($$, EXPR, $1, $2, $3); }
-    | relational_expression '>' shift_expression { set($$, EXPR, $1, $2, $3); }
-    | relational_expression GEQ_OP shift_expression { set($$, EXPR, $1, $2, $3); }
+    | relational_expression '<' shift_expression        { set($$, EXPR, $1, $2, $3); }
+    | relational_expression LEQ_OP shift_expression     { set($$, EXPR, $1, $2, $3); }
+    | relational_expression '>' shift_expression        { set($$, EXPR, $1, $2, $3); }
+    | relational_expression GEQ_OP shift_expression     { set($$, EXPR, $1, $2, $3); }
     ;
 
 equality_expression
     : relational_expression
-    | equality_expression EQ_OP relational_expression { set($$, EXPR, $1, $2, $3); }
-    | equality_expression NEQ_OP relational_expression { set($$, EXPR, $1, $2, $3); }
+    | equality_expression EQ_OP relational_expression   { set($$, EXPR, $1, $2, $3); }
+    | equality_expression NEQ_OP relational_expression  { set($$, EXPR, $1, $2, $3); }
     ;
 
 bitwise_and_expression
@@ -440,3 +442,28 @@ int yyerror(std::string s) {
     std::cerr << "[yyerror] " << s << std::endl;
     return 0;
 }
+
+void print_and_bye(YYSTYPE rt) {
+    if (rt == NULL) return;
+    if (rt->tag == NOTAG) {
+        if (rt->token != NULL) {
+            std::cout << rt->token;
+        }
+        for (size_t i = 0; i < 10; i++) {
+            if (rt->child[i] == NULL) break;
+            print_and_bye(rt->child[i]);
+            rt->child[i] = NULL;
+        }
+    } else {
+        BEG(rt->tag);
+        for (size_t i = 0; i < 10; i++) {
+            if (rt->child[i] == NULL) break;
+            print_and_bye(rt->child[i]);
+            rt->child[i] = NULL;
+        }
+        END(rt->tag);
+    }
+    // kill rt
+    delete rt;
+}
+
