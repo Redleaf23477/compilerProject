@@ -75,11 +75,9 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
-    /*
 \n  { 
     info("consume new line");
 }
-    */
 
 "//" /* begin line comment */ {
     info("enter line comment mode");
