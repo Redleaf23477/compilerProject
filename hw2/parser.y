@@ -109,7 +109,8 @@ external_declaration
  **********************************/
 
 function_definition
-    : declaration_specifiers declarator compound_statement
+    : declaration_specifiers declarator '{' '}'
+    | declaration_specifiers declarator '{' statement_declaration_list '}'
     ;
 
 /**********************************
