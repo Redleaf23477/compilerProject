@@ -43,6 +43,10 @@ void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2) { set(dest, t, { _1, _2 }
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3) { set(dest, t, { _1, _2, _3 } ); }
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4) { set(dest, t, { _1, _2, _3, _4 } ); }
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5) { set(dest, t, { _1, _2, _3, _4, _5 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6) { set(dest, t, { _1, _2, _3, _4, _5, _6 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8, YYSTYPE _9) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9 } ); }
 
 inline void BEG(Tag t) { std::cout << "<" << tag2str(t) << ">"; }
 inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
@@ -98,8 +102,10 @@ translation_unit
     ;
 
 external_declaration
-    : declaration               // e.g. global variables, functions
-    | function_definition       { print_and_bye($1); $$ = NULL; } // e.g. int main() { ... }
+      /* e.g. global variables, functions */
+    : declaration               
+      /* e.g. int main() { ... } */
+    | function_definition   { print_and_bye($1); $$ = NULL; } 
     ;
 
 /**********************************
@@ -137,30 +143,33 @@ selection_statement
     ;
 
 if_statement
-    : IF '(' expression ')' compound_statement
-    | IF '(' expression ')' compound_statement ELSE compound_statement
+    : IF '(' expression ')' compound_statement { set($$, STMT, $1, $2, $3, $4, $5); }
+    | IF '(' expression ')' compound_statement ELSE compound_statement {
+        set($$, STMT, $1, $2, $3, $4, $5, $6, $7); }
     ;
 
 switch_statement
-    : SWITCH '(' expression ')' '{' '}'                     // no switch clause
-    | SWITCH '(' expression ')' '{' switch_clause_list '}'  // 1 or more switch clause
+    : SWITCH '(' expression ')' '{' '}' {
+        set($$, STMT, $1, $2, $3, $4, $5, $6); }
+    | SWITCH '(' expression ')' '{' switch_clause_list '}' {
+        set($$, STMT, $1, $2, $3, $4, $5, $6, $7); }
     ;
 
 switch_clause_list
     : switch_clause
-    | switch_clause switch_clause_list 
+    | switch_clause switch_clause_list      { set($$, NOTAG, $1, $2); }
     ;
 
 switch_clause
     : CASE expression ':' 
-    | CASE expression ':' statement_list
-    | DEFAULT ':'
-    | DEFAULT ':' statement_list
+    | CASE expression ':' statement_list    { set($$, NOTAG, $1, $2, $3); }
+    | DEFAULT ':'                           { set($$, NOTAG, $1, $2); }
+    | DEFAULT ':' statement_list            { set($$, NOTAG, $1, $2, $3); }
     ;
 
 statement_list
     : statement
-    | statement statement_list
+    | statement statement_list  { set($$, NOTAG, $1, $2); }
     ;
 
 iteration_statement
@@ -170,19 +179,21 @@ iteration_statement
     ;
 
 while_statement
-    : WHILE '(' expression ')' statement
+    : WHILE '(' expression ')' statement    { set($$, STMT, $1, $2, $3, $4, $5); }
     ;
 
 do_while_statement
-    : DO statement WHILE '(' expression ')' ';'
+    : DO statement WHILE '(' expression ')' ';' { 
+            set($$, STMT, $1, $2, $3, $4, $5, $6, $7); }
     ;
 
 for_statement
-    : FOR '(' emptiable_expression ';' emptiable_expression ';' emptiable_expression ')' statement
+    : FOR '(' emptiable_expression ';' emptiable_expression ';' emptiable_expression ')' statement {
+            set($$, STMT, $1, $2, $3, $4, $5, $6, $7, $8, $9); }
     ;
 
 emptiable_expression
-    : /* empty */
+    : /* empty */   { $$ = new Node; }
     | expression
     ;
 
@@ -193,28 +204,28 @@ jump_statement
     ;
 
 break_statement
-    : BREAK ';'
+    : BREAK ';'     { set($$, STMT, $1, $2); }
     ;
 
 continue_statement
-    : CONTINUE ';'
+    : CONTINUE ';'  { set($$, STMT, $1, $2); }
     ;
 
 return_statement
-    : RETURN ';'
-    | RETURN expression ';'
+    : RETURN ';'                { set($$, STMT, $1, $2); }
+    | RETURN expression ';'     { set($$, STMT, $1, $2, $3); }
     ;
 
 compound_statement
-    : '{' '}'
-    | '{' statement_declaration_list '}'
+    : '{' '}'                               { set($$, STMT, $1, $2); }
+    | '{' statement_declaration_list '}'    { set($$, STMT, $1, $2, $3); }
     ;
 
 statement_declaration_list
     : statement
     | statement statement_declaration_list      { set($$, NOTAG, $1, $2); }
     | declaration
-    | declaration statement_declaration_list
+    | declaration statement_declaration_list    // TODO: wait until declaration
     ;
 
 /**********************************
@@ -259,11 +270,13 @@ prefix_expression
     | '(' type_name ')' unary_operation_expression  { set($$, EXPR, $1, $2, $3, $4); }
     ;
 
+    // TODO: wait until declaration
 type_name
     : specifier_qualifier_list
     | specifier_qualifier_list pointer
     ;
 
+    // TODO: wait until declaration
 specifier_qualifier_list
     : type_qualifier
     | type_qualifier specifier_qualifier_list
