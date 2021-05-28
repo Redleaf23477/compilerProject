@@ -32,6 +32,7 @@ void set(YYSTYPE &dest, Tag t, std::initializer_list<YYSTYPE> child_list) {
     }
 #ifdef DEV
     for (size_t j = 0; j < i; j++) {
+        if (dest->child[j] == NULL) continue;
         info("c[" << j << "]=(" << (dest->child[j]->token? dest->child[j]->token : "X") << "," << tag2str(dest->child[j]->tag) << ")");
     }
 #endif
@@ -97,9 +98,8 @@ translation_unit
     ;
 
 external_declaration
-    : declaration               // e.g. global variables
-    | statement
-    | function_definition       // e.g. int main() { ... }
+    : declaration               // e.g. global variables, functions
+    | function_definition       { print_and_bye($1); $$ = NULL; } // e.g. int main() { ... }
     ;
 
 /**********************************
@@ -109,8 +109,8 @@ external_declaration
  **********************************/
 
 function_definition
-    : declaration_specifiers declarator '{' '}'
-    | declaration_specifiers declarator '{' statement_declaration_list '}'
+    : declaration_specifiers declarator '{' '}'                             { set($$, FDEF, $1, $2, $3, $4); }
+    | declaration_specifiers declarator '{' statement_declaration_list '}'  { set($$, FDEF, $1, $2, $3, $4, $5); }
     ;
 
 /**********************************
@@ -120,7 +120,7 @@ function_definition
  **********************************/
 
 statement
-    : expression_statement { print_and_bye($1); $$ = NULL; }
+    : expression_statement 
     | selection_statement
     | iteration_statement
     | jump_statement
@@ -212,7 +212,7 @@ compound_statement
 
 statement_declaration_list
     : statement
-    | statement statement_declaration_list
+    | statement statement_declaration_list      { set($$, NOTAG, $1, $2); }
     | declaration
     | declaration statement_declaration_list
     ;
@@ -357,10 +357,14 @@ declaration
 
 // grammar describing a type
 declaration_specifiers
-    : type_specifier                            // e.g. int
-    | type_specifier declaration_specifiers     // e.g. signed int
-    | type_qualifier                            // const
-    | type_qualifier declaration_specifiers     // e.g. const int
+      /* e.g. int */
+    : type_specifier
+      /* e.g. signed int */
+    | type_specifier declaration_specifiers     { set($$, NOTAG, $1, $2); }
+      /* i.e. const */
+    | type_qualifier
+      /* e.g. const int */
+    | type_qualifier declaration_specifiers     { set($$, NOTAG, $1, $2); }
     ;
 
 // terminals: fundamental types
@@ -395,31 +399,34 @@ init_declarator
 
 // declare without/with pointer
 declarator
-    : direct_declarator             // non-pointer
-    | pointer direct_declarator     // single level pointer
+      /* non-pointer */
+    : direct_declarator
+      /* single level pointer */
+    | pointer direct_declarator { set($$, NOTAG, $1, $2); }
     ;
 
 // declare the name of variable
 direct_declarator
     : IDENTIFIER 
-    | IDENTIFIER '(' ')'                    // function with no parameters
-    | IDENTIFIER '(' parameter_list ')'
-    | direct_declarator '[' expression ']' 
+    | IDENTIFIER '(' ')'                    { set($$, NOTAG, $1, $2, $3); }
+    | IDENTIFIER '(' parameter_list ')'     { set($$, NOTAG, $1, $2, $3, $4); }
+    | direct_declarator '[' expression ']'  { set($$, NOTAG, $1, $2, $3, $4); }
     ;
 
 // grammar of parameter list
 parameter_list
     : parameter_declaration
-    | parameter_declaration ',' parameter_list
+    | parameter_declaration ',' parameter_list { set($$, NOTAG, $1, $2, $3); }
     ;
 
 parameter_declaration
-    : declaration_specifiers declarator     // TYPE id
+      /* TYPE id */
+    : declaration_specifiers declarator { set($$, NOTAG, $1, $2); }
     ;
 
 // terminal: pointer (only supports single level pointer)
 pointer
-    : '*'                           // e.g. int *ptr
+    : '*'
     ;
 
 initializer
