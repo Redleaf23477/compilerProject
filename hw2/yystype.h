@@ -21,6 +21,7 @@ std::string tag2str(Tag t);
 struct Node {
     char *token;    // NULL if non-terminal, assigned in lex
     Tag tag;        // NULL if terminal, assigned in yacc
+    Tag hint;       // NULL if non-declaration
     Node* child[10];
 
     Node();

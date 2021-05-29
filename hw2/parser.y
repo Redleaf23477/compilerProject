@@ -48,6 +48,9 @@ void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, Y
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8 } ); }
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8, YYSTYPE _9) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9 } ); }
 
+void set_hint(YYSTYPE &dest, Tag hint) { dest->hint = hint; }
+void set_hint(YYSTYPE &dest, YYSTYPE &child) { dest->hint = child->hint; }
+
 inline void BEG(Tag t) { std::cout << "<" << tag2str(t) << ">"; }
 inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
 
@@ -103,7 +106,7 @@ translation_unit
 
 external_declaration
       /* e.g. global variables, functions */
-    : declaration               
+    : declaration           { print_and_bye($1); $$ = NULL; }
       /* e.g. int main() { ... } */
     | function_definition   { print_and_bye($1); $$ = NULL; } 
     ;
@@ -161,7 +164,7 @@ switch_clause_list
     ;
 
 switch_clause
-    : CASE expression ':' 
+    : CASE expression ':'                   { set($$, NOTAG, $1, $2, $3); }
     | CASE expression ':' statement_list    { set($$, NOTAG, $1, $2, $3); }
     | DEFAULT ':'                           { set($$, NOTAG, $1, $2); }
     | DEFAULT ':' statement_list            { set($$, NOTAG, $1, $2, $3); }
@@ -225,7 +228,7 @@ statement_declaration_list
     : statement
     | statement statement_declaration_list      { set($$, NOTAG, $1, $2); }
     | declaration
-    | declaration statement_declaration_list    // TODO: wait until declaration
+    | declaration statement_declaration_list    { set($$, NOTAG, $1, $2); }
     ;
 
 /**********************************
@@ -365,7 +368,8 @@ expression
  **********************************/
 
 declaration
-    : declaration_specifiers init_declarator_list ';'   // (Type) (id/id=...) ;
+      /* (Type) (id/id=...) ; */
+    : declaration_specifiers init_declarator_list ';' { set($$, $2->hint, $1, $2, $3); }
     ;
 
 // grammar describing a type
@@ -400,30 +404,32 @@ type_qualifier
 
 // grammar describing a set of declaraed name (and possibly initialization)
 init_declarator_list
-    : init_declarator                               // single declared instance
-    | init_declarator ',' init_declarator_list      // multiple declared instance
+      /* single declared instance */
+    : init_declarator                           { $$ = $1, set_hint($$, $1); }
+      /* multiple declared instance */
+    | init_declarator ',' init_declarator_list  { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
     ;
 
 // declare without/with copy initialization
 init_declarator
-    : declarator
-    | declarator '=' initializer
+    : declarator                    { $$ = $1, set_hint($$, $1); }
+    | declarator '=' initializer    { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
     ;
 
 // declare without/with pointer
 declarator
       /* non-pointer */
-    : direct_declarator
+    : direct_declarator         { $$ = $1, set_hint($$, $1); }
       /* single level pointer */
-    | pointer direct_declarator { set($$, NOTAG, $1, $2); }
+    | pointer direct_declarator { set($$, NOTAG, $1, $2), set_hint($$, $2); }
     ;
 
 // declare the name of variable
 direct_declarator
-    : IDENTIFIER 
-    | IDENTIFIER '(' ')'                    { set($$, NOTAG, $1, $2, $3); }
-    | IDENTIFIER '(' parameter_list ')'     { set($$, NOTAG, $1, $2, $3, $4); }
-    | direct_declarator '[' expression ']'  { set($$, NOTAG, $1, $2, $3, $4); }
+    : IDENTIFIER                            { $$ = $1, set_hint($$, SDEC); }
+    | IDENTIFIER '(' ')'                    { set($$, NOTAG, $1, $2, $3), set_hint($$, FDEC); }
+    | IDENTIFIER '(' parameter_list ')'     { set($$, NOTAG, $1, $2, $3, $4), set_hint($$, FDEC); }
+    | direct_declarator '[' expression ']'  { set($$, NOTAG, $1, $2, $3, $4), set_hint($$, ADEC); }
     ;
 
 // grammar of parameter list
@@ -444,12 +450,12 @@ pointer
 
 initializer
     : expression 
-    | '{' initializer_list '}'
+    | '{' initializer_list '}'  { set($$, NOTAG, $1, $2, $3); }
     ;
 
 initializer_list
     : initializer
-    | initializer ',' initializer_list
+    | initializer ',' initializer_list  { set($$, NOTAG, $1, $2, $3); }
     ;
 
 %%

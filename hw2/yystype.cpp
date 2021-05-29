@@ -20,11 +20,11 @@ std::string tag2str(Tag t) {
     }
 }
 
-Node::Node():token(NULL), tag(NOTAG) {
+Node::Node():token(NULL), tag(NOTAG), hint(NOTAG) {
     memset(child, 0, sizeof(child));
 }
 
-Node::Node(char *yytext):token(NULL), tag(NOTAG) {
+Node::Node(char *yytext):token(NULL), tag(NOTAG), hint(NOTAG) {
     int buffsz = strlen(yytext) + 1; // note the '\0'
     token = new char[buffsz];
     memcpy(token, yytext, buffsz);
