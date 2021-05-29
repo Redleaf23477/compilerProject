@@ -4,7 +4,7 @@ YACC = yacc
 CC = gcc
 CXX = g++
 CXXFLAGS = -std=c++17
-DEBUG = -DDEV -Wall -Wextra -g -fsanitize=address
+DEBUG = -g -fsanitize=address
 LDFLAGS = -lfl
 
 all: ytab scanner parser
