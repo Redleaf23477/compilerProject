@@ -165,7 +165,7 @@ switch_clause_list
 
 switch_clause
     : CASE expression ':'                   { set($$, NOTAG, $1, $2, $3); }
-    | CASE expression ':' statement_list    { set($$, NOTAG, $1, $2, $3); }
+    | CASE expression ':' statement_list    { set($$, NOTAG, $1, $2, $3, $4); }
     | DEFAULT ':'                           { set($$, NOTAG, $1, $2); }
     | DEFAULT ':' statement_list            { set($$, NOTAG, $1, $2, $3); }
     ;
@@ -281,18 +281,17 @@ prefix_expression
     | '(' type_name ')' prefix_expression   { set($$, EXPR, $1, $2, $3, $4); }
     ;
 
-    // TODO: wait until declaration
 type_name
     : specifier_qualifier_list
-    | specifier_qualifier_list pointer
+    | specifier_qualifier_list pointer      { set($$, NOTAG, $1, $2); }
     ;
 
     // TODO: wait until declaration
 specifier_qualifier_list
     : type_qualifier
-    | type_qualifier specifier_qualifier_list
+    | type_qualifier specifier_qualifier_list   { set($$, NOTAG, $1, $2); }
     | type_specifier
-    | type_specifier specifier_qualifier_list
+    | type_specifier specifier_qualifier_list   { set($$, NOTAG, $1, $2); }
     ;
 
     /* Left precedence (Left to Right) */
