@@ -254,7 +254,7 @@ suffix_expression
 
 unary_operation_expression
     : suffix_expression
-    | unary_operator suffix_expression { set($$, EXPR, $1, $2); }
+    | unary_operator unary_operation_expression { set($$, EXPR, $1, $2); }
     ;
 
 unary_operator
@@ -268,9 +268,9 @@ unary_operator
 
 prefix_expression
     : unary_operation_expression
-    | INC_OP unary_operation_expression             { set($$, EXPR, $1, $2); }
-    | DEC_OP unary_operation_expression             { set($$, EXPR, $1, $2); }
-    | '(' type_name ')' unary_operation_expression  { set($$, EXPR, $1, $2, $3, $4); }
+    | INC_OP prefix_expression              { set($$, EXPR, $1, $2); }
+    | DEC_OP prefix_expression              { set($$, EXPR, $1, $2); }
+    | '(' type_name ')' prefix_expression   { set($$, EXPR, $1, $2, $3, $4); }
     ;
 
     // TODO: wait until declaration
