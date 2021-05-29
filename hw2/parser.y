@@ -248,8 +248,16 @@ primary_expression
 
 suffix_expression
     : primary_expression
-    | suffix_expression INC_OP { set($$, EXPR, $1, $2); }
-    | suffix_expression DEC_OP { set($$, EXPR, $1, $2); }
+    | suffix_expression INC_OP                              { set($$, EXPR, $1, $2); }
+    | suffix_expression DEC_OP                              { set($$, EXPR, $1, $2); }
+    | suffix_expression '(' ')'                             { set($$, EXPR, $1, $2, $3); }
+    | suffix_expression '(' argument_expression_list ')'    { set($$, EXPR, $1, $2, $3, $4); }
+    | suffix_expression '[' expression ']'                  { set($$, EXPR, $1, $2, $3, $4); }
+    ;
+
+argument_expression_list
+    : assignment_expression 
+    | assignment_expression ',' argument_expression_list { set($$, NOTAG, $1, $2, $3); }
     ;
 
 unary_operation_expression
