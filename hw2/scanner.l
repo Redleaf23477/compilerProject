@@ -54,10 +54,8 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
      *
      **********************************/
 
-    /*
 <BLOCK_COMMENT>\n {
 }
-    */
 
 <BLOCK_COMMENT>"*/" {
     info("exit line comment mode");
