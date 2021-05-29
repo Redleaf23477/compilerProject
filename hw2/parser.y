@@ -92,8 +92,6 @@ void print_and_bye(YYSTYPE);
 // more keywords
 %token IF ELSE SWITCH CASE DEFAULT WHILE DO FOR RETURN BREAK CONTINUE
 
-%token NUL
-
 %start translation_unit
 
 %%
@@ -248,11 +246,18 @@ primary_expression
 
 suffix_expression
     : primary_expression
-    | suffix_expression INC_OP                              { set($$, EXPR, $1, $2); }
-    | suffix_expression DEC_OP                              { set($$, EXPR, $1, $2); }
-    | suffix_expression '(' ')'                             { set($$, EXPR, $1, $2, $3); }
-    | suffix_expression '(' argument_expression_list ')'    { set($$, EXPR, $1, $2, $3, $4); }
-    | suffix_expression '[' expression ']'                  { set($$, EXPR, $1, $2, $3, $4); }
+    | suffix_expression INC_OP                                  { set($$, EXPR, $1, $2); }
+    | suffix_expression DEC_OP                                  { set($$, EXPR, $1, $2); }
+    | suffix_expression '(' ')'                                 { set($$, EXPR, $1, $2, $3); }
+    | suffix_expression '(' argument_expression_list ')'        { set($$, EXPR, $1, $2, $3, $4); }
+      /* array: hw spec differs from c / c++ spec */
+    | IDENTIFIER '[' expression ']'                             { set($$, EXPR, $1, $2, $3, $4); }
+    | IDENTIFIER '[' expression ']' multidim_arr_list           { set($$, EXPR, $1, $2, $3, $4, $5); }
+    ;
+
+multidim_arr_list
+    : '[' expression ']'                        { set($$, NOTAG, $1, $2, $3); }
+    | '[' expression ']' multidim_arr_list      { set($$, NOTAG, $1, $2, $3, $4); }
     ;
 
 argument_expression_list

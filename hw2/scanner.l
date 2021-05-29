@@ -216,10 +216,12 @@ identifiers         [a-zA-Z_][a-zA-Z0-9_]*
 "break"     { yylval = new Node(yytext); report(BREAK); }
 "continue"  { yylval = new Node(yytext); report(CONTINUE); }
 
+
 "NULL"      { 
+    // treat NULL exactly the same as reading `0`
     char buff[2] = "0";
     yylval = new Node(buff); 
-    report(NUL); 
+    report(LITERAL); 
 }
 
     /**********************************
