@@ -47,6 +47,9 @@ void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, Y
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7 } ); }
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8 } ); }
 void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8, YYSTYPE _9) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9 } ); }
+void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, 
+            YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8, YYSTYPE _9, YYSTYPE _10, YYSTYPE _11) { 
+            set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11 } ); }
 
 void set_hint(YYSTYPE &dest, Tag hint) { dest->hint = hint; }
 void set_hint(YYSTYPE &dest, YYSTYPE &child) { dest->hint = child->hint; }
@@ -144,9 +147,15 @@ selection_statement
     ;
 
 if_statement
-    : IF '(' expression ')' compound_statement { set($$, STMT, $1, $2, $3, $4, $5); }
-    | IF '(' expression ')' compound_statement ELSE compound_statement {
+    : IF '(' expression ')' '{' emptiable_statement_declaration_list '}' { 
         set($$, STMT, $1, $2, $3, $4, $5, $6, $7); }
+    | IF '(' expression ')' '{' emptiable_statement_declaration_list '}' ELSE '{' emptiable_statement_declaration_list '}' {
+        set($$, STMT, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); }
+    ;
+
+emptiable_statement_declaration_list
+    : /* empty */                   { $$ = new Node; }
+    | statement_declaration_list
     ;
 
 switch_statement
@@ -487,18 +496,19 @@ int yyerror(std::string s) {
 
 void print_and_bye(YYSTYPE rt) {
     if (rt == NULL) return;
+    size_t n = sizeof(rt->child)/sizeof(Node*);
     if (rt->tag == NOTAG) {
         if (rt->token != NULL) {
             std::cout << rt->token;
         }
-        for (size_t i = 0; i < 10; i++) {
+        for (size_t i = 0; i < n; i++) {
             if (rt->child[i] == NULL) break;
             print_and_bye(rt->child[i]);
             rt->child[i] = NULL;
         }
     } else {
         BEG(rt->tag);
-        for (size_t i = 0; i < 10; i++) {
+        for (size_t i = 0; i < n; i++) {
             if (rt->child[i] == NULL) break;
             print_and_bye(rt->child[i]);
             rt->child[i] = NULL;
