@@ -4,7 +4,7 @@ YACC = yacc
 CC = gcc
 CXX = g++
 CXXFLAGS = -std=c++17
-DEBUG = -g -fsanitize=address
+DEBUG = 
 LDFLAGS = -lfl
 
 all: ytab scanner parser
@@ -28,4 +28,4 @@ parser: yystype.o y.tab.c lex.yy.cpp
 .PHONY: clean
 
 clean:
-	rm -f lex.yy.cpp y.tab.h y.tab.c y.output yystype.o
+	rm -f lex.yy.cpp y.tab.h y.tab.c y.output yystype.o parser
