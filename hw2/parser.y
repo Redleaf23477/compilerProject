@@ -265,9 +265,19 @@ argument_expression_list
     | assignment_expression ',' argument_expression_list { set($$, NOTAG, $1, $2, $3); }
     ;
 
+    /*
 unary_operation_expression
     : suffix_expression
     | unary_operator unary_operation_expression { set($$, EXPR, $1, $2); }
+    ;
+*/
+
+prefix_expression
+    : suffix_expression 
+    | unary_operator prefix_expression      { set($$, EXPR, $1, $2); }
+    | INC_OP prefix_expression              { set($$, EXPR, $1, $2); }
+    | DEC_OP prefix_expression              { set($$, EXPR, $1, $2); }
+    | '(' type_name ')' prefix_expression   { set($$, EXPR, $1, $2, $3, $4); }
     ;
 
 unary_operator
@@ -277,13 +287,6 @@ unary_operator
     | '~'
     | '+'
     | '-'
-    ;
-
-prefix_expression
-    : unary_operation_expression
-    | INC_OP prefix_expression              { set($$, EXPR, $1, $2); }
-    | DEC_OP prefix_expression              { set($$, EXPR, $1, $2); }
-    | '(' type_name ')' prefix_expression   { set($$, EXPR, $1, $2, $3, $4); }
     ;
 
 type_name
