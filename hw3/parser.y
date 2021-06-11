@@ -4,6 +4,7 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <initializer_list>
 
 #ifdef DEV
@@ -20,46 +21,96 @@ extern "C" {
 
 // yylval Type Definition
 #include "yystype.h"
+#include "y.tab.h"
 
 // usefull helper functions
 
-void set(YYSTYPE &dest, Tag t, std::initializer_list<YYSTYPE> child_list) {
+Visitor visitor;
+
+//////////////////////////////////////////////////
+// AST Builder
+//////////////////////////////////////////////////
+
+
+using NodePtr = Node*;
+
+void set(NodePtr &_dest, Tag t, std::initializer_list<NodePtr> child_list) {
+    Node* &dest = _dest;
     dest = new Node;
     dest->tag = t;
     size_t i = 0;
     for (auto c : child_list) {
         dest->child[i++] = c;
     }
-#ifdef DEV
-    for (size_t j = 0; j < i; j++) {
-        if (dest->child[j] == NULL) continue;
-        info("c[" << j << "]=(" << (dest->child[j]->token? dest->child[j]->token : "X") << "," << tag2str(dest->child[j]->tag) << ")");
-    }
-#endif
 }
 
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1) { set(dest, t, { _1 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2) { set(dest, t, { _1, _2 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3) { set(dest, t, { _1, _2, _3 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4) { set(dest, t, { _1, _2, _3, _4 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5) { set(dest, t, { _1, _2, _3, _4, _5 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6) { set(dest, t, { _1, _2, _3, _4, _5, _6 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8, YYSTYPE _9) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9 } ); }
-void set(YYSTYPE &dest, Tag t, YYSTYPE _1, YYSTYPE _2, YYSTYPE _3, YYSTYPE _4, 
-            YYSTYPE _5, YYSTYPE _6, YYSTYPE _7, YYSTYPE _8, YYSTYPE _9, YYSTYPE _10, YYSTYPE _11) { 
-            set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1) { set(dest, t, { _1 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2) { set(dest, t, { _1, _2 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3) { set(dest, t, { _1, _2, _3 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4) { set(dest, t, { _1, _2, _3, _4 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5) { set(dest, t, { _1, _2, _3, _4, _5 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6) { set(dest, t, { _1, _2, _3, _4, _5, _6 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8, NodePtr _9) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9 } ); }
+void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8, NodePtr _9, NodePtr _10, NodePtr _11) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11 } ); }
 
-void set_hint(YYSTYPE &dest, Tag hint) { dest->hint = hint; }
-void set_hint(YYSTYPE &dest, YYSTYPE &child) { dest->hint = child->hint; }
+void set_hint(NodePtr &dest, Tag hint) { dest->hint = hint; }
+void set_hint(NodePtr &dest, NodePtr &child) { dest->hint = child->hint; }
 
 inline void BEG(Tag t) { std::cout << "<" << tag2str(t) << ">"; }
 inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
 
+//////////////////////////////////////////////////
+// Symbol Table
+// - Note: No type support (64-bit int only)
+//////////////////////////////////////////////////
+
+enum VarMode {
+    M_LOCAL,
+    M_GLOBAL,
+    M_PARAMETER
+};
+
+struct Symbol {
+    std::string name;
+    int scope;
+    int offset;
+    VarMode mode;  // local var or parameters
+    std::vector<std::string> parameters;
+};
+
+std::vector<std::string> _init_declarator_buffer;
+std::vector<std::string> _parameter_buffer;
+
+std::vector<Symbol> symbol_table;
+void push_symbol() {
+    // TODO
+}
+
+int _current_scope;
+int enter_scope() { return ++_current_scope; }
+int leave_scope() { return --_current_scope; }
+
+//////////////////////////////////////////////////
+// TODO
+//////////////////////////////////////////////////
+
 void print_and_bye(YYSTYPE);
+void print_and_bye(Node*);
 
 %}
+
+/**********************************
+ *
+ * YYSTYPE Definition
+ *
+ **********************************/
+
+%union {
+    Node* node;
+}
+
 
 /**********************************
  *
@@ -67,11 +118,11 @@ void print_and_bye(YYSTYPE);
  *
  **********************************/
 
-%token IDENTIFIER
-%token LITERAL
+%token<node> IDENTIFIER
+%token<node> LITERAL
 
 // operators
-%token INC_OP DEC_OP LEQ_OP GEQ_OP EQ_OP NEQ_OP RSHIFT_OP LSHIFT_OP LAND_OP LOR_OP
+%token<node> INC_OP DEC_OP LEQ_OP GEQ_OP EQ_OP NEQ_OP RSHIFT_OP LSHIFT_OP LAND_OP LOR_OP
 
 // binary operator precedence
 %right '='
@@ -87,13 +138,96 @@ void print_and_bye(YYSTYPE);
 %left '*' '/' '%'
 
 // type qualifiter
-%token CONST
+%token<node> CONST
 
 // type specifier
-%token INT CHAR FLOAT DOUBLE VOID SIGNED UNSIGNED LONG SHORT
+%token<node> INT CHAR FLOAT DOUBLE VOID SIGNED UNSIGNED LONG SHORT
 
 // more keywords
-%token IF ELSE SWITCH CASE DEFAULT WHILE DO FOR RETURN BREAK CONTINUE
+%token<node> IF ELSE SWITCH CASE DEFAULT WHILE DO FOR RETURN BREAK CONTINUE
+
+// terminals represented by char
+%type<node> '!'
+%type<node> '%'
+%type<node> '&'
+%type<node> '('
+%type<node> ')'
+%type<node> '*'
+%type<node> '+'
+%type<node> ','
+%type<node> '-'
+%type<node> '/'
+%type<node> ':'
+%type<node> ';'
+%type<node> '<'
+%type<node> '='
+%type<node> '>'
+%type<node> '['
+%type<node> ']'
+%type<node> '^'
+%type<node> '{'
+%type<node> '|'
+%type<node> '}'
+%type<node> '~'
+
+// non-terminals
+
+%type<node> translation_unit
+%type<node> external_declaration
+%type<node> function_definition
+%type<node> statement
+%type<node> expression_statement
+%type<node> selection_statement
+%type<node> if_statement
+%type<node> emptiable_statement_declaration_list
+%type<node> switch_statement
+%type<node> switch_clause_list
+%type<node> switch_clause
+%type<node> statement_list
+%type<node> iteration_statement
+%type<node> while_statement
+%type<node> do_while_statement
+%type<node> for_statement
+%type<node> emptiable_expression
+%type<node> jump_statement
+%type<node> break_statement
+%type<node> continue_statement
+%type<node> return_statement
+%type<node> compound_statement
+%type<node> statement_declaration_list
+%type<node> primary_expression
+%type<node> suffix_expression
+%type<node> multidim_arr_list
+%type<node> argument_expression_list
+%type<node> prefix_expression
+%type<node> unary_operator
+%type<node> type_name
+%type<node> specifier_qualifier_list
+%type<node> multiplicative_expression
+%type<node> additive_expression
+%type<node> shift_expression
+%type<node> relational_expression
+%type<node> equality_expression
+%type<node> bitwise_and_expression
+%type<node> bitwise_xor_expression
+%type<node> bitwise_or_expression
+%type<node> logical_and_expression
+%type<node> logical_or_expression
+%type<node> assignment_expression
+%type<node> expression
+%type<node> declaration
+%type<node> declaration_specifiers
+%type<node> type_specifier
+%type<node> type_qualifier
+%type<node> init_declarator_list
+%type<node> init_declarator
+%type<node> declarator
+%type<node> direct_declarator
+%type<node> parameter_list
+%type<node> parameter_declaration
+%type<node> pointer
+%type<node> initializer
+%type<node> initializer_list
 
 %start translation_unit
 
@@ -397,15 +531,16 @@ declaration
     ;
 
 // grammar describing a type
+// forget about type and const, supporting 64-bit int only
 declaration_specifiers
       /* e.g. int */
     : type_specifier
       /* e.g. signed int */
-    | type_specifier declaration_specifiers     { set($$, NOTAG, $1, $2); }
+    | type_specifier declaration_specifiers
       /* i.e. const */
     | type_qualifier
       /* e.g. const int */
-    | type_qualifier declaration_specifiers     { set($$, NOTAG, $1, $2); }
+    | type_qualifier declaration_specifiers
     ;
 
 // terminals: fundamental types
@@ -459,7 +594,7 @@ direct_declarator
 // grammar of parameter list
 parameter_list
     : parameter_declaration
-    | parameter_declaration ',' parameter_list { set($$, NOTAG, $1, $2, $3); }
+    | parameter_declaration ',' parameter_list  { set($$, NOTAG, $1, $2, $3); }
     ;
 
 parameter_declaration
@@ -485,6 +620,9 @@ initializer_list
 %%
 
 int main(void) {
+    // initialize
+    _current_scope = 0;
+    // parse & codegen
     yyparse();
     return 0;
 }
@@ -494,9 +632,12 @@ int yyerror(std::string s) {
     return 0;
 }
 
-void print_and_bye(YYSTYPE rt) {
+void print_and_bye(YYSTYPE rt) { print_and_bye(rt.node); }
+
+void print_and_bye(Node *rt) {
     if (rt == NULL) return;
     size_t n = sizeof(rt->child)/sizeof(Node*);
+
     if (rt->tag == NOTAG) {
         if (rt->token != NULL) {
             std::cout << rt->token;
@@ -518,4 +659,3 @@ void print_and_bye(YYSTYPE rt) {
     // kill rt
     delete rt;
 }
-

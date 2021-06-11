@@ -4,6 +4,8 @@
 #include <cassert>
 #include "yystype.h"
 
+// utils
+
 std::string tag2str(Tag t) {
     switch (t) {
     case SDEC: return "scalar_decl";
@@ -19,6 +21,8 @@ std::string tag2str(Tag t) {
         return "unknown";
     }
 }
+
+// Node Class
 
 Node::Node():token(NULL), tag(NOTAG), hint(NOTAG) {
     memset(child, 0, sizeof(child));
@@ -41,4 +45,6 @@ std::ostream &operator << (std::ostream &out, Node &nd) {
     }
     return out;
 }
+
+// Vistor
 

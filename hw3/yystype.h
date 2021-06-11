@@ -2,9 +2,10 @@
 #define YYSTYPE_H_
 
 #include <string>
+#include <vector>
 #include <iostream>
 
-#define YYSTYPE Node*
+// #define YYSTYPE Node*
 
 enum Tag {
     NOTAG,  // should not be assigned tag
@@ -17,6 +18,21 @@ enum Tag {
 };
 
 std::string tag2str(Tag t);
+
+// AST Nodes Declaration
+
+struct Node;
+struct N_List;
+
+// Visitor Declaration
+
+struct Visitor {
+};
+
+// AST Nodes Definition
+
+
+// Base Class
 
 struct Node {
     char *token;    // NULL if non-terminal, assigned in lex
