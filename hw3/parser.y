@@ -129,6 +129,12 @@ void codegen(Declaration*);
     Type* type;
     TranslationUnit* translation_unit;
     Declaration* decl;
+    FuncDefn* func_defn;
+    Statement* stmt;
+    ExpressionStatement* expr_stmt;
+    Expression* expr;
+    NodeList<Expression*>* expr_list;
+    NodeList<Node*>* node_list;
 }
 
 
@@ -195,9 +201,9 @@ void codegen(Declaration*);
 %type<node> codegen
 %type<translation_unit> translation_unit
 %type<decl> external_declaration
-%type<node> function_definition
-%type<node> statement
-%type<node> expression_statement
+%type<func_defn> function_definition
+%type<stmt> statement
+%type<expr_stmt> expression_statement
 %type<node> selection_statement
 %type<node> if_statement
 %type<node> emptiable_statement_declaration_list
@@ -215,27 +221,27 @@ void codegen(Declaration*);
 %type<node> continue_statement
 %type<node> return_statement
 %type<node> compound_statement
-%type<node> statement_declaration_list
-%type<node> primary_expression
-%type<node> suffix_expression
+%type<node_list> statement_declaration_list
+%type<expr> primary_expression
+%type<expr> suffix_expression
 %type<node> multidim_arr_list
-%type<node> argument_expression_list
-%type<node> prefix_expression
+%type<expr_list> argument_expression_list
+%type<expr> prefix_expression
 %type<node> unary_operator
 %type<node> type_name
 %type<node> specifier_qualifier_list
-%type<node> multiplicative_expression
-%type<node> additive_expression
-%type<node> shift_expression
-%type<node> relational_expression
-%type<node> equality_expression
-%type<node> bitwise_and_expression
-%type<node> bitwise_xor_expression
-%type<node> bitwise_or_expression
-%type<node> logical_and_expression
-%type<node> logical_or_expression
-%type<node> assignment_expression
-%type<node> expression
+%type<expr> multiplicative_expression
+%type<expr> additive_expression
+%type<expr> shift_expression
+%type<expr> relational_expression
+%type<expr> equality_expression
+%type<expr> bitwise_and_expression
+%type<expr> bitwise_xor_expression
+%type<expr> bitwise_or_expression
+%type<expr> logical_and_expression
+%type<expr> logical_or_expression
+%type<expr> assignment_expression
+%type<expr> expression
 %type<decl> declaration
 %type<type> declaration_specifiers
 %type<node> type_specifier
@@ -260,8 +266,8 @@ codegen
     : translation_unit { codegen($1); cleanup($1); $$ = NULL; }
 
 translation_unit
-    : external_declaration { $$ = new TranslationUnit(); $$->add_declaration($1); }
-    | translation_unit external_declaration
+    : external_declaration                      { $$ = new TranslationUnit(); $$->add_extern_decl($1); }
+    | translation_unit external_declaration     { $$ = $1; $$->add_extern_decl($2); }
     ;
 
 external_declaration
@@ -278,8 +284,8 @@ external_declaration
  **********************************/
 
 function_definition
-    : declaration_specifiers declarator '{' '}'                             { set($$, FDEF, $1, $2, $3, $4); }
-    | declaration_specifiers declarator '{' statement_declaration_list '}'  { set($$, FDEF, $1, $2, $3, $4, $5); }
+    : declaration_specifiers declarator '{' '}'                             { $$ = new FuncDefn($1, $2->token); cleanup($3, $4); }
+    | declaration_specifiers declarator '{' statement_declaration_list '}'  { $$ = new FuncDefn($1, $2->token, $4); cleanup($3, $5); }
     ;
 
 /**********************************
@@ -297,7 +303,7 @@ statement
     ;
 
 expression_statement
-    : expression ';' { set($$, STMT, $1, $2); }
+    : expression ';' { $$ = new ExpressionStatement($1); cleanup($2); }
     ;
 
 selection_statement
@@ -391,10 +397,10 @@ compound_statement
     ;
 
 statement_declaration_list
-    : statement
-    | statement statement_declaration_list      { set($$, NOTAG, $1, $2); }
-    | declaration
-    | declaration statement_declaration_list    { set($$, NOTAG, $1, $2); }
+    : statement                                 { $$ = new NodeList<Node*>; $$->push($1); }
+    | statement_declaration_list statement      { $$ = $1; $$->push($2); }
+    | declaration                               { $$ = new NodeList<Node*>; $$->push($1); }
+    | statement_declaration_list declaration    { $$ = $1; $$->push($2); }
     ;
 
 /**********************************
@@ -405,22 +411,22 @@ statement_declaration_list
 
 // highest precedence, should not be separated
 primary_expression
-    : IDENTIFIER            { set($$, EXPR, $1); }
-    | LITERAL               { set($$, EXPR, $1); }
-    | '(' expression ')'    { set($$, EXPR, $1, $2, $3); }
+    : IDENTIFIER            { $$ = new Identifier($1->token); cleanup($1); }
+    | LITERAL               //{ set($$, EXPR, $1); }
+    | '(' expression ')'    //{ set($$, EXPR, $1, $2, $3); }
     ;
 
     /* Right precedence (Right to Left) */
 
 suffix_expression
     : primary_expression
-    | suffix_expression INC_OP                                  { set($$, EXPR, $1, $2); }
-    | suffix_expression DEC_OP                                  { set($$, EXPR, $1, $2); }
-    | suffix_expression '(' ')'                                 { set($$, EXPR, $1, $2, $3); }
-    | suffix_expression '(' argument_expression_list ')'        { set($$, EXPR, $1, $2, $3, $4); }
+    | suffix_expression INC_OP                                  //{ set($$, EXPR, $1, $2); }
+    | suffix_expression DEC_OP                                  //{ set($$, EXPR, $1, $2); }
+    | suffix_expression '(' ')'                                 { $$ = new CallExpression($1); cleanup($2, $3); }
+    | suffix_expression '(' argument_expression_list ')'        { $$ = new CallExpression($1, $3); cleanup($2, $3, $4); }
       /* array: hw spec differs from c / c++ spec */
-    | IDENTIFIER '[' expression ']'                             { set($$, EXPR, $1, $2, $3, $4); }
-    | IDENTIFIER '[' expression ']' multidim_arr_list           { set($$, EXPR, $1, $2, $3, $4, $5); }
+    | IDENTIFIER '[' expression ']'                             //{ set($$, EXPR, $1, $2, $3, $4); }
+    | IDENTIFIER '[' expression ']' multidim_arr_list           //{ set($$, EXPR, $1, $2, $3, $4, $5); }
     ;
 
 multidim_arr_list
@@ -429,8 +435,8 @@ multidim_arr_list
     ;
 
 argument_expression_list
-    : assignment_expression 
-    | assignment_expression ',' argument_expression_list { set($$, NOTAG, $1, $2, $3); }
+    : assignment_expression                                 { $$ = new NodeList<Expression*>; $$->push($1); }
+    | argument_expression_list ',' assignment_expression    { $$ = $1; $$->push($3); cleanup($2); }
     ;
 
     /*
@@ -442,10 +448,10 @@ unary_operation_expression
 
 prefix_expression
     : suffix_expression 
-    | unary_operator prefix_expression      { set($$, EXPR, $1, $2); }
-    | INC_OP prefix_expression              { set($$, EXPR, $1, $2); }
-    | DEC_OP prefix_expression              { set($$, EXPR, $1, $2); }
-    | '(' type_name ')' prefix_expression   { set($$, EXPR, $1, $2, $3, $4); }
+    | unary_operator prefix_expression      //{ set($$, EXPR, $1, $2); }
+    | INC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
+    | DEC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
+    | '(' type_name ')' prefix_expression   //{ set($$, EXPR, $1, $2, $3, $4); }
     ;
 
 unary_operator
@@ -474,60 +480,60 @@ specifier_qualifier_list
 
 multiplicative_expression
     : prefix_expression
-    | multiplicative_expression '*' prefix_expression { set($$, EXPR, $1, $2, $3); }
-    | multiplicative_expression '/' prefix_expression { set($$, EXPR, $1, $2, $3); }
-    | multiplicative_expression '%' prefix_expression { set($$, EXPR, $1, $2, $3); }
+    | multiplicative_expression '*' prefix_expression //{ set($$, EXPR, $1, $2, $3); }
+    | multiplicative_expression '/' prefix_expression //{ set($$, EXPR, $1, $2, $3); }
+    | multiplicative_expression '%' prefix_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 additive_expression
     : multiplicative_expression
-    | additive_expression '+' multiplicative_expression { set($$, EXPR, $1, $2, $3); }
-    | additive_expression '-' multiplicative_expression { set($$, EXPR, $1, $2, $3); }
+    | additive_expression '+' multiplicative_expression //{ set($$, EXPR, $1, $2, $3); }
+    | additive_expression '-' multiplicative_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 shift_expression
     : additive_expression
-    | shift_expression LSHIFT_OP additive_expression { set($$, EXPR, $1, $2, $3); }
-    | shift_expression RSHIFT_OP additive_expression { set($$, EXPR, $1, $2, $3); }
+    | shift_expression LSHIFT_OP additive_expression //{ set($$, EXPR, $1, $2, $3); }
+    | shift_expression RSHIFT_OP additive_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 relational_expression
     : shift_expression
-    | relational_expression '<' shift_expression        { set($$, EXPR, $1, $2, $3); }
-    | relational_expression LEQ_OP shift_expression     { set($$, EXPR, $1, $2, $3); }
-    | relational_expression '>' shift_expression        { set($$, EXPR, $1, $2, $3); }
-    | relational_expression GEQ_OP shift_expression     { set($$, EXPR, $1, $2, $3); }
+    | relational_expression '<' shift_expression        //{ set($$, EXPR, $1, $2, $3); }
+    | relational_expression LEQ_OP shift_expression     //{ set($$, EXPR, $1, $2, $3); }
+    | relational_expression '>' shift_expression        //{ set($$, EXPR, $1, $2, $3); }
+    | relational_expression GEQ_OP shift_expression     //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 equality_expression
     : relational_expression
-    | equality_expression EQ_OP relational_expression   { set($$, EXPR, $1, $2, $3); }
-    | equality_expression NEQ_OP relational_expression  { set($$, EXPR, $1, $2, $3); }
+    | equality_expression EQ_OP relational_expression   //{ set($$, EXPR, $1, $2, $3); }
+    | equality_expression NEQ_OP relational_expression  //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 bitwise_and_expression
     : equality_expression
-    | bitwise_and_expression '&' equality_expression { set($$, EXPR, $1, $2, $3); }
+    | bitwise_and_expression '&' equality_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 bitwise_xor_expression
     : bitwise_and_expression
-    | bitwise_xor_expression '^' bitwise_and_expression { set($$, EXPR, $1, $2, $3); }
+    | bitwise_xor_expression '^' bitwise_and_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 bitwise_or_expression
     : bitwise_xor_expression
-    | bitwise_or_expression '|' bitwise_xor_expression { set($$, EXPR, $1, $2, $3); }
+    | bitwise_or_expression '|' bitwise_xor_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 logical_and_expression
     : bitwise_or_expression
-    | logical_and_expression LAND_OP bitwise_or_expression { set($$, EXPR, $1, $2, $3); }
+    | logical_and_expression LAND_OP bitwise_or_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 logical_or_expression
     : logical_and_expression
-    | logical_or_expression LOR_OP logical_and_expression { set($$, EXPR, $1, $2, $3); }
+    | logical_or_expression LOR_OP logical_and_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 
@@ -535,7 +541,7 @@ logical_or_expression
 
 assignment_expression
     : logical_or_expression
-    | logical_or_expression '=' assignment_expression { set($$, EXPR, $1, $2, $3); }
+    | logical_or_expression '=' assignment_expression //{ set($$, EXPR, $1, $2, $3); }
     ;
 
 // lowest precedence, includes everything

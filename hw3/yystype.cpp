@@ -46,31 +46,119 @@ std::ostream &operator << (std::ostream &out, Node &nd) {
     return out;
 }
 
-// Vistor
+TranslationUnit::~TranslationUnit() {
+    for (auto x : decl_func_list) delete x;
+}
+
+Declaration::~Declaration() {
+    delete type;
+}
+
+FuncDecl::~FuncDecl() {
+    for (auto x : parameter_list) delete x;
+}
+
+FuncDefn::~FuncDefn() {
+    for (auto x : func_body) delete x;
+}
+
+ExpressionStatement::~ExpressionStatement() {
+    delete expr;
+}
+
+UnaryExpression::~UnaryExpression() {
+    delete expr;
+}
+
+CallExpression::~CallExpression() {
+    for (auto x : argument_list) delete x;
+}
+
+Identifier::Identifier(char *str) {
+    token = new char[strlen(str)+1];
+    memcpy(token, str, strlen(str)+1);
+}
+
+// Vistor (AST)
 
 void Visitor::visit(Node &node) {
-    std::cerr << "visiting Node" << std::endl;
+    AST << indent() << "<Node>" << std::endl;
 }
 
 void Visitor::visit(TranslationUnit &unit) {
-    std::cerr << "visiting TranslationUnit" << std::endl;
+    AST << indent() << "<Translation Unit>" << std::endl;
+
+    inc_indent();
     for (auto x : unit.decl_func_list) {
         x->accept(*this);
     }
+    dec_indent();
 }
 
 void Visitor::visit(Declaration &decl) {
-    std::cerr << "visiting declaration" << std::endl;
-    if (decl.get_data_type() == int_type) std::cerr << "[type: int]";
-    std::cerr << "[declaration name: " << decl.token << "]";
-    std::cerr << std::endl;
+    AST << indent() << "<Declaration>";
+    if (decl.get_data_type() == int_type) AST << "[type: int]";
+    AST << "[declaration name: " << decl.token << "]";
+    AST << std::endl;
 }
 
 void Visitor::visit(FuncDecl &decl) {
-    std::cerr << "visiting function declaration" << std::endl;
-    if (decl.get_data_type() == int_type) std::cerr << "[return: int]";
-    std::cerr << "[function name: " << decl.token << "]";
-    std::cerr << "[parameters: ]";
-    std::cerr << std::endl;
+    AST << indent() << "<Function Declaration>";
+    if (decl.get_data_type() == int_type) AST << "[return: int]";
+    AST << "[function name: " << decl.token << "]";
+    AST << "[parameters: ]";
+    AST << std::endl;
 }
 
+void Visitor::visit(FuncDefn &defn) {
+    AST << indent() << "<Function Definition>";
+    if (defn.get_data_type() == int_type) AST << "[return: int]";
+    AST << "[function name: " << defn.token << "]";
+    AST << "[parameters: ]";
+    AST << std::endl;
+
+    inc_indent();
+    for (auto c : defn.func_body) c->accept(*this);
+    dec_indent();
+}
+
+void Visitor::visit(Statement &stmt) {
+    AST << indent() << "<Statement>" << std::endl;
+}
+
+void Visitor::visit(ExpressionStatement &expr_stmt) {
+    AST << indent() << "<Expression Statement>" << std::endl;
+
+    inc_indent();
+    expr_stmt.expr->accept(*this);
+    dec_indent();
+}
+
+void Visitor::visit(Expression &expr) {
+    AST << indent() << "<Expression>" << std::endl;
+}
+
+void Visitor::visit(UnaryExpression &expr) {
+    AST << indent() << "<Unary Expression>";
+    AST << "[op = " << expr.op << "]";
+    AST << std::endl;
+
+    inc_indent();
+    expr.expr->accept(*this);
+    dec_indent();
+}
+
+void Visitor::visit(CallExpression &expr) {
+    AST << indent() << "<Call Expression>" << std::endl;
+
+    inc_indent();
+    expr.expr->accept(*this);
+    for (auto a : expr.argument_list) a->accept(*this);
+    dec_indent();
+}
+
+void Visitor::visit(Identifier &id) {
+    AST << indent() << "<Identifier>";
+    AST << "[identifier = " << id.token << "]";
+    AST << std::endl;
+}

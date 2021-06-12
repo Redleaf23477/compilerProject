@@ -4,16 +4,16 @@ YACC = yacc
 CC = gcc
 CXX = g++
 CXXFLAGS = -std=c++17
-DEBUG = 
+DEBUG = -g -fsanitize=address
 LDFLAGS = -lfl
 
-all: ytab scanner codegen
+all: ytab yystype scanner codegen
 
 ytab: parser.y
 	${BYACC} -d parser.y
 
 yystype: yystype.cpp yystype.h
-	${CXX} ${CXXFLAGS} ${DEBUG} -o $@.o $<
+	${CXX} -c ${CXXFLAGS} ${DEBUG} -o $@.o $<
 
 conflict: parser.y
 	${YACC} -v $^
