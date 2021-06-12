@@ -28,4 +28,4 @@ codegen: yystype.o y.tab.c lex.yy.cpp
 .PHONY: clean
 
 clean:
-	rm -f lex.yy.cpp y.tab.h y.tab.c y.output yystype.o parser
+	rm -f lex.yy.cpp y.tab.h y.tab.c y.output yystype.o parser codegen

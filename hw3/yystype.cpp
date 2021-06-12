@@ -48,3 +48,29 @@ std::ostream &operator << (std::ostream &out, Node &nd) {
 
 // Vistor
 
+void Visitor::visit(Node &node) {
+    std::cerr << "visiting Node" << std::endl;
+}
+
+void Visitor::visit(TranslationUnit &unit) {
+    std::cerr << "visiting TranslationUnit" << std::endl;
+    for (auto x : unit.decl_func_list) {
+        x->accept(*this);
+    }
+}
+
+void Visitor::visit(Declaration &decl) {
+    std::cerr << "visiting declaration" << std::endl;
+    if (decl.get_data_type() == int_type) std::cerr << "[type: int]";
+    std::cerr << "[declaration name: " << decl.token << "]";
+    std::cerr << std::endl;
+}
+
+void Visitor::visit(FuncDecl &decl) {
+    std::cerr << "visiting function declaration" << std::endl;
+    if (decl.get_data_type() == int_type) std::cerr << "[return: int]";
+    std::cerr << "[function name: " << decl.token << "]";
+    std::cerr << "[parameters: ]";
+    std::cerr << std::endl;
+}
+

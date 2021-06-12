@@ -55,6 +55,21 @@ void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, N
 void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8, NodePtr _9) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9 } ); }
 void set(NodePtr &dest, Tag t, NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8, NodePtr _9, NodePtr _10, NodePtr _11) { set(dest, t, { _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11 } ); }
 
+void cleanup(std::initializer_list<NodePtr> child_list) {
+    for (auto c : child_list) delete c;
+}
+
+void cleanup(NodePtr _1) { cleanup({ _1 } ); }
+void cleanup(NodePtr _1, NodePtr _2) { cleanup({ _1, _2 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3) { cleanup({ _1, _2, _3 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4) { cleanup({ _1, _2, _3, _4 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5) { cleanup({ _1, _2, _3, _4, _5 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6) { cleanup({ _1, _2, _3, _4, _5, _6 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7) { cleanup({ _1, _2, _3, _4, _5, _6, _7 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8) { cleanup({ _1, _2, _3, _4, _5, _6, _7, _8 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8, NodePtr _9) { cleanup({ _1, _2, _3, _4, _5, _6, _7, _8, _9 } ); }
+void cleanup(NodePtr _1, NodePtr _2, NodePtr _3, NodePtr _4, NodePtr _5, NodePtr _6, NodePtr _7, NodePtr _8, NodePtr _9, NodePtr _10, NodePtr _11) { cleanup({ _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11 } ); }
+
 void set_hint(NodePtr &dest, Tag hint) { dest->hint = hint; }
 void set_hint(NodePtr &dest, NodePtr &child) { dest->hint = child->hint; }
 
@@ -99,6 +114,8 @@ int leave_scope() { return --_current_scope; }
 void print_and_bye(YYSTYPE);
 void print_and_bye(Node*);
 
+void codegen(Declaration*);
+
 %}
 
 /**********************************
@@ -109,6 +126,9 @@ void print_and_bye(Node*);
 
 %union {
     Node* node;
+    Type* type;
+    TranslationUnit* translation_unit;
+    Declaration* decl;
 }
 
 
@@ -172,8 +192,9 @@ void print_and_bye(Node*);
 
 // non-terminals
 
-%type<node> translation_unit
-%type<node> external_declaration
+%type<node> codegen
+%type<translation_unit> translation_unit
+%type<decl> external_declaration
 %type<node> function_definition
 %type<node> statement
 %type<node> expression_statement
@@ -215,35 +236,39 @@ void print_and_bye(Node*);
 %type<node> logical_or_expression
 %type<node> assignment_expression
 %type<node> expression
-%type<node> declaration
-%type<node> declaration_specifiers
+%type<decl> declaration
+%type<type> declaration_specifiers
 %type<node> type_specifier
 %type<node> type_qualifier
-%type<node> init_declarator_list
-%type<node> init_declarator
-%type<node> declarator
-%type<node> direct_declarator
+%type<decl> init_declarator_list
+%type<decl> init_declarator
+%type<decl> declarator
+%type<decl> direct_declarator
 %type<node> parameter_list
 %type<node> parameter_declaration
 %type<node> pointer
 %type<node> initializer
 %type<node> initializer_list
 
-%start translation_unit
+%start codegen
 
 %%
 
 // entry point for parsing
+
+codegen
+    : translation_unit { codegen($1); cleanup($1); $$ = NULL; }
+
 translation_unit
-    : external_declaration
+    : external_declaration { $$ = new TranslationUnit(); $$->add_declaration($1); }
     | translation_unit external_declaration
     ;
 
 external_declaration
       /* e.g. global variables, functions */
-    : declaration           { print_and_bye($1); $$ = NULL; }
+    : declaration
       /* e.g. int main() { ... } */
-    | function_definition   { print_and_bye($1); $$ = NULL; } 
+    | function_definition
     ;
 
 /**********************************
@@ -527,14 +552,14 @@ expression
 
 declaration
       /* (Type) (id/id=...) ; */
-    : declaration_specifiers init_declarator_list ';' { set($$, $2->hint, $1, $2, $3); }
+    : declaration_specifiers init_declarator_list ';' { $2->set_type($1); $$ = $2; cleanup($3); }
     ;
 
 // grammar describing a type
 // forget about type and const, supporting 64-bit int only
 declaration_specifiers
       /* e.g. int */
-    : type_specifier
+    : type_specifier { $$ = new Type(int_type); cleanup($1); }  // TODO
       /* e.g. signed int */
     | type_specifier declaration_specifiers
       /* i.e. const */
@@ -564,31 +589,31 @@ type_qualifier
 // grammar describing a set of declaraed name (and possibly initialization)
 init_declarator_list
       /* single declared instance */
-    : init_declarator                           { $$ = $1, set_hint($$, $1); }
+    : init_declarator
       /* multiple declared instance */
-    | init_declarator ',' init_declarator_list  { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
+    | init_declarator ',' init_declarator_list  // { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
     ;
 
 // declare without/with copy initialization
 init_declarator
-    : declarator                    { $$ = $1, set_hint($$, $1); }
-    | declarator '=' initializer    { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
+    : declarator
+    | declarator '=' initializer    // { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
     ;
 
 // declare without/with pointer
 declarator
       /* non-pointer */
-    : direct_declarator         { $$ = $1, set_hint($$, $1); }
+    : direct_declarator
       /* single level pointer */
-    | pointer direct_declarator { set($$, NOTAG, $1, $2), set_hint($$, $2); }
+    | pointer direct_declarator // { set($$, NOTAG, $1, $2), set_hint($$, $2); }
     ;
 
 // declare the name of variable
 direct_declarator
-    : IDENTIFIER                            { $$ = $1, set_hint($$, SDEC); }
-    | IDENTIFIER '(' ')'                    { set($$, NOTAG, $1, $2, $3), set_hint($$, FDEC); }
-    | IDENTIFIER '(' parameter_list ')'     { set($$, NOTAG, $1, $2, $3, $4), set_hint($$, FDEC); }
-    | direct_declarator '[' expression ']'  { set($$, NOTAG, $1, $2, $3, $4), set_hint($$, ADEC); }
+    : IDENTIFIER                            //{ $$ = $1, set_hint($$, SDEC); }
+    | IDENTIFIER '(' ')'                    { $$ = new FuncDecl($1->token); cleanup($1, $2, $3); }
+    | IDENTIFIER '(' parameter_list ')'     //{ set($$, NOTAG, $1, $2, $3, $4), set_hint($$, FDEC); }
+    | direct_declarator '[' expression ']'  //{ set($$, NOTAG, $1, $2, $3, $4), set_hint($$, ADEC); }
     ;
 
 // grammar of parameter list
@@ -658,4 +683,8 @@ void print_and_bye(Node *rt) {
     }
     // kill rt
     delete rt;
+}
+
+void codegen(TranslationUnit *unit) {
+    unit->accept(visitor);
 }
