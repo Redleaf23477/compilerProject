@@ -77,37 +77,6 @@ inline void BEG(Tag t) { std::cout << "<" << tag2str(t) << ">"; }
 inline void END(Tag t) { std::cout << "</" << tag2str(t) << ">"; }
 
 //////////////////////////////////////////////////
-// Symbol Table
-// - Note: No type support (64-bit int only)
-//////////////////////////////////////////////////
-
-enum VarMode {
-    M_LOCAL,
-    M_GLOBAL,
-    M_PARAMETER
-};
-
-struct Symbol {
-    std::string name;
-    int scope;
-    int offset;
-    VarMode mode;  // local var or parameters
-    std::vector<std::string> parameters;
-};
-
-std::vector<std::string> _init_declarator_buffer;
-std::vector<std::string> _parameter_buffer;
-
-std::vector<Symbol> symbol_table;
-void push_symbol() {
-    // TODO
-}
-
-int _current_scope;
-int enter_scope() { return ++_current_scope; }
-int leave_scope() { return --_current_scope; }
-
-//////////////////////////////////////////////////
 // TODO
 //////////////////////////////////////////////////
 
@@ -651,8 +620,6 @@ initializer_list
 %%
 
 int main(void) {
-    // initialize
-    _current_scope = 0;
     // parse & codegen
     yyparse();
     return 0;

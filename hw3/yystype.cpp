@@ -117,9 +117,9 @@ void Visitor::visit(FuncDefn &defn) {
     AST << "[parameters: ]";
     AST << std::endl;
 
-    inc_indent();
+    inc_indent(), scope.enter();
     for (auto c : defn.func_body) c->accept(*this);
-    dec_indent();
+    dec_indent(), scope.leave();
 }
 
 void Visitor::visit(Statement &stmt) {

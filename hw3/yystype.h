@@ -37,17 +37,55 @@ struct Identifier;
 
 template<typename T = Node*> struct NodeList;
 
+// Symbol Table (No type support yet)
+
+enum VarMode {
+    M_LOCAL,
+    M_GLOBAL,
+    M_PARAMETER
+};
+
+struct Symbol {
+    std::string name;
+    int scope;
+    int offset;
+    VarMode mode;  // local var or parameters
+    std::vector<std::string> parameters;
+};
+
+struct SymbolTable {
+    std::vector<Symbol> table;
+};
+
+struct Scope {
+    int scope;
+
+    Scope():scope(0) {}
+
+    int enter() { return ++scope; }
+    int leave() { return --scope; }
+    int get_scope() { return scope; }
+};
+
 // Visitor Declaration
 
 struct Visitor {
-    std::ofstream AST;
-    int ast_indent;
+    // output file discriptor
+    std::ofstream AST, ASM;
 
-    Visitor():AST("ast.txt"), ast_indent(0) {}
+    // ast related member
+    int ast_indent;
 
     void inc_indent() { ast_indent++; }
     void dec_indent() { ast_indent--; }
     std::string indent() { return std::string(ast_indent*2, ' '); }
+
+    // codegen related member
+    SymbolTable table;
+    Scope scope;
+
+    // constructor & visitor pattern
+    Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0) {}
 
     void visit(Node &);
     void visit(TranslationUnit &);
@@ -63,7 +101,6 @@ struct Visitor {
 };
 
 // AST Nodes Definition
-
 
 // The very base class
 
