@@ -381,7 +381,7 @@ statement_declaration_list
 // highest precedence, should not be separated
 primary_expression
     : IDENTIFIER            { $$ = new Identifier($1->token); cleanup($1); }
-    | LITERAL               //{ set($$, EXPR, $1); }
+    | LITERAL               { $$ = new Literal($1->token); cleanup($1); }
     | '(' expression ')'    //{ set($$, EXPR, $1, $2, $3); }
     ;
 

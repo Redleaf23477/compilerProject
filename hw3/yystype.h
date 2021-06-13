@@ -34,6 +34,7 @@ struct Expression;
 struct UnaryExpression;
 struct CallExpression;
 struct Identifier;
+struct Literal;
 
 template<typename T = Node*> struct NodeList;
 
@@ -83,6 +84,8 @@ struct Visitor {
     // codegen related member
     SymbolTable table;
     Scope scope;
+    void save_regs_on_stack(std::string whom, std::vector<std::string> &regs);
+    void restore_regs_from_stack(std::string whom, std::vector<std::string> &regs);
 
     // constructor & visitor pattern
     Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0) {}
@@ -98,9 +101,25 @@ struct Visitor {
     void visit(UnaryExpression &);
     void visit(CallExpression &);
     void visit(Identifier &);
+    void visit(Literal &);
 };
 
 // AST Nodes Definition
+
+struct CodegenDest {
+    enum Dest { reg, mem, no_gen };
+    Dest dest; // true for register, false for stack
+    std::string reg_name;
+    int mem_offset;  // relative to stack pointer
+
+    bool is_reg() { return dest == reg; }
+    bool is_mem() { return dest == mem; }
+
+    void set_reg(std::string _reg) { dest = reg, std::swap(_reg, reg_name); }
+    void set_mem(int _offset) { dest = mem, mem_offset = _offset; }
+
+    CodegenDest():dest(no_gen) {}
+};
 
 // The very base class
 
@@ -212,9 +231,13 @@ struct ExpressionStatement : public Statement {
 // Expression
 
 struct Expression : public Node {
+    CodegenDest dest;
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
     virtual ~Expression() {}
+
+    void set_save_to_reg(std::string reg) { dest.set_reg(reg); }
+    void set_save_to_mem(int offset) { dest.set_mem(offset); }
 };
 
 struct UnaryExpression : public Expression {
@@ -242,6 +265,11 @@ struct CallExpression : public UnaryExpression {
 struct Identifier : public Expression {
     void accept(Visitor &visitor) { visitor.visit(*this); }
     Identifier(char *str);
+};
+
+struct Literal : public Expression { 
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+    Literal(char *str);
 };
 
 
