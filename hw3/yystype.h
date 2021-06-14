@@ -61,7 +61,9 @@ struct ScalarDecl;
 struct ArrayDecl;
 struct TranslationUnit;
 struct Statement;
+struct CompoundStatement;
 struct ExpressionStatement;
+struct IfStatement;
 struct Expression;
 struct UnaryExpression;
 struct BinaryExpression;
@@ -161,7 +163,9 @@ struct Visitor {
     void visit(ScalarDecl &);
     void visit(ArrayDecl &);
     void visit(Statement &);
+    void visit(CompoundStatement &);
     void visit(ExpressionStatement &);
+    void visit(IfStatement &);
     void visit(Expression &);
     void visit(UnaryExpression &);
     void visit(BinaryExpression &);
@@ -278,13 +282,12 @@ struct FuncDecl : public Declaration {
 };
 
 struct FuncDefn : public FuncDecl {
-    std::vector<Node*> func_body;
+    Statement *func_body;
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    FuncDefn(Type* _type, char *str, NodeList<Node*> *body = nullptr):FuncDecl(str) { 
+    FuncDefn(Type* _type, char *str, Statement *body):FuncDecl(str), func_body(body) { 
         set_type(_type); 
-        if (body) std::swap(body->arr, func_body);
     }
     ~FuncDefn();
 };
@@ -310,6 +313,29 @@ struct Statement : public Node {
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
     virtual ~Statement() {}
+};
+
+struct CompoundStatement : public Statement {
+    std::vector<Node*> stmt_decl_list;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+
+    CompoundStatement(NodeList<Node*> *_list) {
+        std::swap(_list->arr, stmt_decl_list);
+    }
+    ~CompoundStatement();
+};
+
+// If Statement (including if-else)
+// Note: there is no else-if in spec, forget about it
+
+struct IfStatement : public Statement {
+    Expression *cond;
+    Statement *if_body, *else_body;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+    IfStatement(Expression *_cond, Statement *_if, Statement *_else = nullptr) : cond(_cond), if_body(_if), else_body(_else) {}
+    ~IfStatement();
 };
 
 // Expression Statement

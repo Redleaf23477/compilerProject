@@ -121,7 +121,17 @@ FuncDecl::~FuncDecl() {
 }
 
 FuncDefn::~FuncDefn() {
-    for (auto x : func_body) delete x;
+    delete func_body;
+}
+
+CompoundStatement::~CompoundStatement() {
+    for (auto x : stmt_decl_list) delete x;
+}
+
+IfStatement::~IfStatement() {
+    delete cond;
+    delete if_body;
+    if (else_body) delete else_body;
 }
 
 ExpressionStatement::~ExpressionStatement() {
@@ -208,10 +218,8 @@ void Visitor::visit(FuncDefn &defn) {
 
 
     inc_indent();
-    scope.enter();
-    for (auto c : defn.func_body) c->accept(*this);
+    defn.func_body->accept(*this);
     dec_indent();
-    scope.leave();
 
     // restore callee preserved registers
     ASM << "  // release local variables" << std::endl;
@@ -271,6 +279,26 @@ void Visitor::visit(ArrayDecl &decl) {
 
 void Visitor::visit(Statement &stmt) {
     AST << indent() << "<Statement>" << std::endl;
+}
+
+void Visitor::visit(CompoundStatement &stmt) {
+    AST << indent() << "<Compund Statement" << std::endl;
+
+    inc_indent();
+    scope.enter();
+    for (auto c : stmt.stmt_decl_list) c->accept(*this);
+    dec_indent();
+    scope.leave();
+}
+
+void Visitor::visit(IfStatement &if_stmt) {
+    AST << indent() << "<If Statement>" << std::endl;
+
+    inc_indent();
+    if_stmt.cond->accept(*this);
+    if_stmt.if_body->accept(*this);
+    if (if_stmt.else_body) if_stmt.else_body->accept(*this);
+    dec_indent();
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {

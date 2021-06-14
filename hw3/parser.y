@@ -174,8 +174,7 @@ void codegen(Declaration*);
 %type<stmt> statement
 %type<expr_stmt> expression_statement
 %type<node> selection_statement
-%type<node> if_statement
-%type<node> emptiable_statement_declaration_list
+%type<stmt> if_statement
 %type<node> switch_statement
 %type<node> switch_clause_list
 %type<node> switch_clause
@@ -189,7 +188,7 @@ void codegen(Declaration*);
 %type<node> break_statement
 %type<node> continue_statement
 %type<node> return_statement
-%type<node> compound_statement
+%type<stmt> compound_statement
 %type<node_list> statement_declaration_list
 %type<expr> primary_expression
 %type<expr> suffix_expression
@@ -253,8 +252,7 @@ external_declaration
  **********************************/
 
 function_definition
-    : declaration_specifiers declarator '{' '}'                             { $$ = new FuncDefn($1, $2->token); cleanup($3, $4); }
-    | declaration_specifiers declarator '{' statement_declaration_list '}'  { $$ = new FuncDefn($1, $2->token, $4); cleanup($3, $5); }
+    : declaration_specifiers declarator compound_statement { $$ = new FuncDefn($1, $2->token, $3); }
     ;
 
 /**********************************
@@ -281,15 +279,9 @@ selection_statement
     ;
 
 if_statement
-    : IF '(' expression ')' '{' emptiable_statement_declaration_list '}' { 
-        set($$, STMT, $1, $2, $3, $4, $5, $6, $7); }
-    | IF '(' expression ')' '{' emptiable_statement_declaration_list '}' ELSE '{' emptiable_statement_declaration_list '}' {
-        set($$, STMT, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11); }
-    ;
-
-emptiable_statement_declaration_list
-    : /* empty */                   { $$ = new Node; }
-    | statement_declaration_list
+    : IF '(' expression ')' compound_statement { $$ = new IfStatement($3, $5); cleanup($1, $2, $4); }
+    | IF '(' expression ')' compound_statement ELSE compound_statement {
+        $$ = new IfStatement($3, $5, $7); cleanup($1, $2, $4, $6); }
     ;
 
 switch_statement
@@ -361,8 +353,8 @@ return_statement
     ;
 
 compound_statement
-    : '{' '}'                               { set($$, STMT, $1, $2); }
-    | '{' statement_declaration_list '}'    { set($$, STMT, $1, $2, $3); }
+    : '{' '}'                               { $$ = new CompoundStatement(new NodeList<Node*>); cleanup($1, $2); }
+    | '{' statement_declaration_list '}'    { $$ = new CompoundStatement($2); cleanup($1, $2, $3); }
     ;
 
 statement_declaration_list
