@@ -134,6 +134,11 @@ IfStatement::~IfStatement() {
     if (else_body) delete else_body;
 }
 
+DoStatement::~DoStatement() {
+    delete cond;
+    delete body;
+}
+
 ExpressionStatement::~ExpressionStatement() {
     delete expr;
 }
@@ -334,6 +339,14 @@ void Visitor::visit(IfStatement &if_stmt) {
     ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
 
     ASM << "  // <<< IfStatement" << std::endl;
+}
+
+void Visitor::visit(DoStatement &do_stmt) {
+    AST << indent() << "<Do While Statement>" << std::endl;
+    inc_indent();
+    do_stmt.body->accept(*this);
+    do_stmt.cond->accept(*this);
+    dec_indent();
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {

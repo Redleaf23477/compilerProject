@@ -64,6 +64,7 @@ struct Statement;
 struct CompoundStatement;
 struct ExpressionStatement;
 struct IfStatement;
+struct DoStatement;  // do-while
 struct Expression;
 struct UnaryExpression;
 struct BinaryExpression;
@@ -172,6 +173,7 @@ struct Visitor {
     void visit(CompoundStatement &);
     void visit(ExpressionStatement &);
     void visit(IfStatement &);
+    void visit(DoStatement &);
     void visit(Expression &);
     void visit(UnaryExpression &);
     void visit(BinaryExpression &);
@@ -342,6 +344,17 @@ struct IfStatement : public Statement {
     void accept(Visitor &visitor) { visitor.visit(*this); }
     IfStatement(Expression *_cond, Statement *_if, Statement *_else = nullptr) : cond(_cond), if_body(_if), else_body(_else) {}
     ~IfStatement();
+};
+
+// Do While Statement
+
+struct DoStatement : public Statement {
+    Expression *cond;
+    Statement *body;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+    DoStatement(Expression *_cond, Statement *_body) : cond(_cond), body(_body) {}
+    ~DoStatement();
 };
 
 // Expression Statement

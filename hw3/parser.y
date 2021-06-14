@@ -179,9 +179,9 @@ void codegen(Declaration*);
 %type<node> switch_clause_list
 %type<node> switch_clause
 %type<node> statement_list
-%type<node> iteration_statement
+%type<stmt> iteration_statement
 %type<node> while_statement
-%type<node> do_while_statement
+%type<stmt> do_while_statement
 %type<node> for_statement
 %type<node> emptiable_expression
 %type<node> jump_statement
@@ -319,8 +319,7 @@ while_statement
     ;
 
 do_while_statement
-    : DO statement WHILE '(' expression ')' ';' { 
-            set($$, STMT, $1, $2, $3, $4, $5, $6, $7); }
+    : DO statement WHILE '(' expression ')' ';' { $$ = new DoStatement($5, $2); cleanup($1, $3, $4, $6, $7); }
     ;
 
 for_statement
