@@ -242,6 +242,16 @@ void Visitor::visit(ScalarDecl &decl) {
     dec_indent();
 }
 
+void Visitor::visit(ArrayDecl &decl) {
+    AST << indent() << "<Array Declaration>";
+    AST << "[variable name = " << decl.token << "]";
+    AST << "[element type = " << get_type_name(decl.get_data_type()) << "]";
+    AST << "[array size = " << decl.array_size << "]";
+    AST << std::endl;
+
+    // note: there is no array initializer in the test cases, forget about them
+}
+
 void Visitor::visit(Statement &stmt) {
     AST << indent() << "<Statement>" << std::endl;
 }

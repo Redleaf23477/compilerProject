@@ -592,7 +592,8 @@ direct_declarator
     : IDENTIFIER                            { $$ = new ScalarDecl($1->token); cleanup($1); }
     | IDENTIFIER '(' ')'                    { $$ = new FuncDecl($1->token); cleanup($1, $2, $3); }
     | IDENTIFIER '(' parameter_list ')'     //{ set($$, NOTAG, $1, $2, $3, $4), set_hint($$, FDEC); }
-    | direct_declarator '[' expression ']'  //{ set($$, NOTAG, $1, $2, $3, $4), set_hint($$, ADEC); }
+      /* supports simple 1D array declation only, e.g. arr[3] */
+    | direct_declarator '[' expression ']'  { $$ = new ArrayDecl($1->token, atoi($3->token)); cleanup($1, $2, $3, $4); }
     ;
 
 // grammar of parameter list

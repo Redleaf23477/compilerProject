@@ -52,6 +52,7 @@ struct Declaration;
 struct FuncDecl;
 struct FuncDefn;
 struct ScalarDecl;
+struct ArrayDecl;
 struct TranslationUnit;
 struct Statement;
 struct ExpressionStatement;
@@ -151,6 +152,7 @@ struct Visitor {
     void visit(FuncDecl &);
     void visit(FuncDefn &);
     void visit(ScalarDecl &);
+    void visit(ArrayDecl &);
     void visit(Statement &);
     void visit(ExpressionStatement &);
     void visit(Expression &);
@@ -285,6 +287,13 @@ struct ScalarDecl : public Declaration {
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
     ScalarDecl(char* str):Declaration(str) {}
+};
+
+struct ArrayDecl : public Declaration {
+    int array_size;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+    ArrayDecl(char* str, int _size):Declaration(str), array_size(_size) {}
 };
 
 // Statement Base Class
