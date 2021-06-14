@@ -35,11 +35,16 @@ enum Operator {
     op_div,
     op_mod,
     op_neg,
+    // Relational
+    op_lt,
+    op_eq,
     // Assignment
     op_assign,
     // Pointer & Address
     op_addr,
-    op_deref
+    op_deref,
+    // member access
+    op_subscript
 };
 
 std::string get_op_name(Operator op);
@@ -60,6 +65,7 @@ struct Expression;
 struct UnaryExpression;
 struct BinaryExpression;
 struct CallExpression;
+struct ArraySubscriptExpression;
 struct Identifier;
 struct Literal;
 
@@ -159,6 +165,7 @@ struct Visitor {
     void visit(UnaryExpression &);
     void visit(BinaryExpression &);
     void visit(CallExpression &);
+    void visit(ArraySubscriptExpression &);
     void visit(Identifier &);
     void visit(Literal &);
 };
@@ -359,6 +366,15 @@ struct CallExpression : public UnaryExpression {
         if (nl != nullptr) set_argument_list(nl); 
     }
     ~CallExpression();
+};
+
+struct ArraySubscriptExpression : public UnaryExpression {
+    Expression *subscript;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+
+    ArraySubscriptExpression(Expression *arr, Expression *sub):UnaryExpression(op_subscript, arr), subscript(sub) {}
+    ~ArraySubscriptExpression();
 };
 
 struct Identifier : public Expression {

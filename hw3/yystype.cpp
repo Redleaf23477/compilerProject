@@ -29,10 +29,13 @@ std::string get_op_name(Operator op) {
     case op_sub: return "sub";
     case op_mul: return "mul";
     case op_div: return "div";
+    case op_lt: return "less than";
+    case op_eq: return "equal to";
     case op_assign: return "assign";
     case op_addr: return "address of";
     case op_deref: return "de-reference";
     case op_neg: return "arithmetic negate";
+    case op_subscript: return "subscript";
     }
     std::cerr << "unrecognized op code: " << static_cast<int>(op) << std::endl;
     assert (false && "invalid operator");
@@ -136,6 +139,10 @@ BinaryExpression::~BinaryExpression() {
 
 CallExpression::~CallExpression() {
     for (auto x : argument_list) delete x;
+}
+
+ArraySubscriptExpression::~ArraySubscriptExpression() {
+    delete subscript;
 }
 
 Identifier::Identifier(char *str) {
@@ -431,6 +438,15 @@ void Visitor::visit(CallExpression &expr) {
 
     ASM << "  // <<< CallExpression" << std::endl;
 
+    dec_indent();
+}
+
+void Visitor::visit(ArraySubscriptExpression &expr) {
+    AST << indent() << "<Array Subscript Expression>" << std::endl;
+
+    inc_indent();
+    expr.expr->accept(*this);
+    expr.subscript->accept(*this);
     dec_indent();
 }
 

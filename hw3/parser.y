@@ -394,7 +394,7 @@ suffix_expression
     | suffix_expression '(' ')'                                 { $$ = new CallExpression($1); cleanup($2, $3); }
     | suffix_expression '(' argument_expression_list ')'        { $$ = new CallExpression($1, $3); cleanup($2, $3, $4); }
       /* array: hw spec differs from c / c++ spec */
-    | IDENTIFIER '[' expression ']'                             //{ set($$, EXPR, $1, $2, $3, $4); }
+    | IDENTIFIER '[' expression ']'                             { $$ = new ArraySubscriptExpression(new Identifier($1->token), $3); cleanup($1, $2, $4); }
     | IDENTIFIER '[' expression ']' multidim_arr_list           //{ set($$, EXPR, $1, $2, $3, $4, $5); }
     ;
 
@@ -472,7 +472,7 @@ shift_expression
 
 relational_expression
     : shift_expression
-    | relational_expression '<' shift_expression        //{ set($$, EXPR, $1, $2, $3); }
+    | relational_expression '<' shift_expression        { $$ = new BinaryExpression(op_lt, $1, $3); cleanup($2); }
     | relational_expression LEQ_OP shift_expression     //{ set($$, EXPR, $1, $2, $3); }
     | relational_expression '>' shift_expression        //{ set($$, EXPR, $1, $2, $3); }
     | relational_expression GEQ_OP shift_expression     //{ set($$, EXPR, $1, $2, $3); }
@@ -480,7 +480,7 @@ relational_expression
 
 equality_expression
     : relational_expression
-    | equality_expression EQ_OP relational_expression   //{ set($$, EXPR, $1, $2, $3); }
+    | equality_expression EQ_OP relational_expression   { $$ = new BinaryExpression(op_eq, $1, $3); cleanup($2); }
     | equality_expression NEQ_OP relational_expression  //{ set($$, EXPR, $1, $2, $3); }
     ;
 
