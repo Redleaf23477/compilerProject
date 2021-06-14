@@ -196,7 +196,7 @@ void codegen(Declaration*);
 %type<node> multidim_arr_list
 %type<expr_list> argument_expression_list
 %type<expr> prefix_expression
-%type<node> unary_operator
+// %type<node> unary_operator
 %type<node> type_name
 %type<node> specifier_qualifier_list
 %type<expr> multiplicative_expression
@@ -221,7 +221,7 @@ void codegen(Declaration*);
 %type<decl> direct_declarator
 %type<node> parameter_list
 %type<node> parameter_declaration
-%type<node> pointer
+%type<type> pointer
 %type<expr> initializer
 %type<node> initializer_list
 
@@ -417,12 +417,15 @@ unary_operation_expression
 
 prefix_expression
     : suffix_expression 
-    | unary_operator prefix_expression      //{ set($$, EXPR, $1, $2); }
+    | '&' prefix_expression                 { $$ = new UnaryExpression(op_addr, $2); cleanup($1); }
+    | '*' prefix_expression                 { $$ = new UnaryExpression(op_deref, $2); cleanup($1); } 
+    | '-' prefix_expression                 { $$ = new UnaryExpression(op_neg, $2); cleanup($1); } 
     | INC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
     | DEC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
     | '(' type_name ')' prefix_expression   //{ set($$, EXPR, $1, $2, $3, $4); }
     ;
 
+    /*
 unary_operator
     : '&'
     | '*'
@@ -431,6 +434,7 @@ unary_operator
     | '+'
     | '-'
     ;
+    */
 
 type_name
     : specifier_qualifier_list
@@ -527,20 +531,20 @@ expression
 
 declaration
       /* (Type) (id/id=...) ; */
-    : declaration_specifiers init_declarator_list ';' { $2->set_type($1); $$ = $2; cleanup($3); }
+    : declaration_specifiers init_declarator_list ';' { $$ = $2; $$->set_type($1); cleanup($3); }
     ;
 
 // grammar describing a type
 // forget about type and const, supporting 64-bit int only
 declaration_specifiers
       /* e.g. int */
-    : type_specifier { $$ = new Type(T_INT); cleanup($1); }  // TODO
+    : type_specifier                        { $$ = new Type(T_INT); cleanup($1); }
       /* e.g. signed int */
-    | type_specifier declaration_specifiers
+    | type_specifier declaration_specifiers { $$ = new Type(T_INT); cleanup($1, $2); }
       /* i.e. const */
-    | type_qualifier
+    | type_qualifier                        { $$ = new Type(T_INT); cleanup($1); }
       /* e.g. const int */
-    | type_qualifier declaration_specifiers
+    | type_qualifier declaration_specifiers { $$ = new Type(T_INT); cleanup($1, $2); }
     ;
 
 // terminals: fundamental types
@@ -580,7 +584,7 @@ declarator
       /* non-pointer */
     : direct_declarator
       /* single level pointer */
-    | pointer direct_declarator // { set($$, NOTAG, $1, $2), set_hint($$, $2); }
+    | pointer direct_declarator { $$ = $2; $$->set_type($1); }
     ;
 
 // declare the name of variable
@@ -604,7 +608,7 @@ parameter_declaration
 
 // terminal: pointer (only supports single level pointer)
 pointer
-    : '*'
+    : '*' { $$ = new Type(T_PTR); cleanup($1); }
     ;
 
 initializer

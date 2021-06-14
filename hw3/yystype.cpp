@@ -30,6 +30,9 @@ std::string get_op_name(Operator op) {
     case op_mul: return "mul";
     case op_div: return "div";
     case op_assign: return "assign";
+    case op_addr: return "address of";
+    case op_deref: return "de-reference";
+    case op_neg: return "arithmetic negate";
     }
     std::cerr << "unrecognized op code: " << static_cast<int>(op) << std::endl;
     assert (false && "invalid operator");
@@ -50,6 +53,7 @@ std::string get_value_type_name(ValueType type) {
     switch (type) {
     case lvalue: return "lvalue";
     case rvalue: return "rvalue";
+    case no_value: return "no_value";
     }
     std::cerr << "unrecognized value type: " << static_cast<int>(type) << std::endl;
     assert (false && "invalid value type");
@@ -260,9 +264,57 @@ void Visitor::visit(UnaryExpression &expr) {
     AST << "[value type = " << get_value_type_name(expr.dest.value_type) << "]";
     AST << std::endl;
 
+    ASM << "  // UnaryExpression >>>" << std::endl;
+
+    // allocate temp
+    int tmp_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    expr.expr->set_save_to_mem(tmp_offset);
+    ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
+
+    // set value type
+    if (expr.op == op_addr) {
+        expr.expr->set_gen_lvalue();
+    } else {
+        expr.expr->set_gen_rvalue();
+    }
+
+    // traverse child
     inc_indent();
     expr.expr->accept(*this);
     dec_indent();
+
+    // codegen
+    // load result into register
+    ASM << "  ld t0, " << tmp_offset << "(fp)" << std::endl;
+
+    // operator codegen
+    switch (expr.op) {
+    case op_addr: break;  // t0 is already address of the variable
+    case op_deref: break;  // t0 is now the address of the variable that is pointed to
+    case op_neg: ASM << "  sub t0, x0, t0" << std::endl; break;
+    default: 
+        std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
+        assert(false && "unsupported unary operator codegen");
+    }
+
+    // Note that op_addr, op_neg must return rvalue
+    // Cast op_deref if required
+    if (expr.op == op_deref && expr.dest.is_rvalue()) {
+        ASM << "  ld t0, 0(t0)" << std::endl;
+    }
+
+    // return value
+    if (expr.dest.is_reg()) {
+        ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
+    } else if (expr.dest.is_mem()) {
+        ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
+    }
+
+    // release temp
+    symbol_table.pop_stack(1);
+    ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
+
+    ASM << "  // <<< UnaryExpression" << std::endl;
 }
 
 void Visitor::visit(BinaryExpression &expr) {
@@ -296,6 +348,9 @@ void Visitor::visit(BinaryExpression &expr) {
 
         // operator codegen
         ASM << "  sd t1, 0(t0)" << std::endl;
+
+        // cast to rvalue if needed
+        if (expr.dest.is_rvalue()) ASM << "  addi t0, t1, 0" << std::endl;
     } else {  // arithmetic
         expr.lhs->set_gen_rvalue();
         expr.rhs->set_gen_rvalue();
@@ -318,8 +373,10 @@ void Visitor::visit(BinaryExpression &expr) {
         case op_div: ASM << "  div t0, t0, t1" << std::endl; break;
         default: 
             std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
-            assert(false && "unsupported operator codegen");
+            assert(false && "unsupported binary operator codegen");
         }
+
+        // Note: arithmetic operator should always be rvalue
     }
 
     // return value

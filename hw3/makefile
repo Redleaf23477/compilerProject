@@ -13,6 +13,8 @@ ARDUINO_MAIN = Spike/assembly/main.c
 
 all: ytab yystype scanner codegen
 
+judge: basic_test arithmetic_test pointer_test
+
 ytab: parser.y
 	${BYACC} -d parser.y
 
@@ -57,6 +59,23 @@ arithmetic_test: codegen
 	${SPIKE_PK} ./$@ | tee out
 	diff out Testcase/ArithmeticExpression/1.ans
 
+pointer_test: codegen
+	@echo "=================="
+	@echo "0.c"
+	@echo "=================="
+	./codegen <Testcase/Pointer/0.c
+	${RISCV_CXX} -o codegen.o -c codegen.S
+	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	${SPIKE_PK} ./$@ | tee out
+	diff out Testcase/Pointer/0.ans
+	@echo "=================="
+	@echo "1.c"
+	@echo "=================="
+	./codegen <Testcase/Pointer/1.c
+	${RISCV_CXX} -o codegen.o -c codegen.S
+	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	${SPIKE_PK} ./$@ | tee out
+	diff out Testcase/Pointer/1.ans
 
 test:
 	${RISCV_CXX} -o codegen.o -c codegen.S

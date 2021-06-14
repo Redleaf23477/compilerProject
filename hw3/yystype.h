@@ -34,8 +34,12 @@ enum Operator {
     op_mul,
     op_div,
     op_mod,
+    op_neg,
     // Assignment
-    op_assign
+    op_assign,
+    // Pointer & Address
+    op_addr,
+    op_deref
 };
 
 std::string get_op_name(Operator op);
@@ -215,6 +219,9 @@ struct Type : public Node {
     DataType type;
 
     Type(DataType _type):type(_type) {}
+    void add(Type *_type) {
+        if (_type->type == T_PTR) type = T_PTR;
+    }
 };
 
 // Translation Unit Class
@@ -235,12 +242,15 @@ struct Declaration : public Node {
     Type *type; // scalar, atomic element of array, return type of function
     Expression *initializer;
 
-    Declaration(char *txt):Node(txt), initializer(nullptr) {}
+    Declaration(char *txt):Node(txt), type(nullptr), initializer(nullptr) {}
     virtual ~Declaration();
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    void set_type(Type* _type) { type = _type; }
+    void set_type(Type* _type) { 
+        if (type == nullptr) type = _type;
+        else { type->add(_type); delete _type; }
+    }
     DataType get_data_type() { return type->type; }
 
     void set_initializer(Expression *init) { initializer = init; }
