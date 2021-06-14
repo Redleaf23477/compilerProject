@@ -46,6 +46,16 @@ std::string get_type_name(DataType type) {
     return "unreachable";
 }
 
+std::string get_value_type_name(ValueType type) {
+    switch (type) {
+    case lvalue: return "lvalue";
+    case rvalue: return "rvalue";
+    }
+    std::cerr << "unrecognized value type: " << static_cast<int>(type) << std::endl;
+    assert (false && "invalid value type");
+    return "unreachable";
+}
+
 void Visitor::save_regs_on_stack(std::string whom, std::vector<std::string> &regs) {
     ASM << "  // " << whom << " saves registers >>>" << std::endl;
     ASM << "  addi sp, sp, " << -WORD_SIZE * (int)regs.size() << std::endl;
@@ -96,6 +106,7 @@ TranslationUnit::~TranslationUnit() {
 
 Declaration::~Declaration() {
     delete type;
+    if (initializer) delete initializer;
 }
 
 FuncDecl::~FuncDecl() {
@@ -216,6 +227,15 @@ void Visitor::visit(ScalarDecl &decl) {
 
     // codegen: simply grow the stack
     ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
+
+    // initializer
+    inc_indent();
+    if (decl.initializer != nullptr) {
+        decl.initializer->set_save_to_mem(sym->offset);
+        decl.initializer->set_gen_rvalue();
+        decl.initializer->accept(*this); 
+    }
+    dec_indent();
 }
 
 void Visitor::visit(Statement &stmt) {
@@ -237,6 +257,7 @@ void Visitor::visit(Expression &expr) {
 void Visitor::visit(UnaryExpression &expr) {
     AST << indent() << "<Unary Expression>";
     AST << "[op = " << get_op_name(expr.op) << "]";
+    AST << "[value type = " << get_value_type_name(expr.dest.value_type) << "]";
     AST << std::endl;
 
     inc_indent();
@@ -247,18 +268,72 @@ void Visitor::visit(UnaryExpression &expr) {
 void Visitor::visit(BinaryExpression &expr) {
     AST << indent() << "<Binary Expression>";
     AST << "[op = " << get_op_name(expr.op) << "]";
+    AST << "[value type = " << get_value_type_name(expr.dest.value_type) << "]";
     AST << std::endl;
 
-    inc_indent();
-    expr.lhs->accept(*this);
-    expr.rhs->accept(*this);
-    dec_indent();
+    ASM << "  // Binary Expression >>>" << std::endl;
+
+    // allocate temp
+    int lhs_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int rhs_offset = symbol_table.push_stack(1) * WORD_SIZE; 
+    expr.lhs->set_save_to_mem(lhs_offset);
+    expr.rhs->set_save_to_mem(rhs_offset);
+    ASM << "  addi sp, sp, " << -2*WORD_SIZE << std::endl;
 
     if (expr.op == op_assign) {
-        // TODO
+        expr.lhs->set_gen_lvalue();
+        expr.rhs->set_gen_rvalue();
+
+        // traverse to child
+        inc_indent();
+        expr.lhs->accept(*this);
+        expr.rhs->accept(*this);
+        dec_indent();
+
+        // load lhs, rhs result into registers
+        ASM << "  ld t0, " << lhs_offset << "(fp)" << std::endl;
+        ASM << "  ld t1, " << rhs_offset << "(fp)" << std::endl;
+
+        // operator codegen
+        ASM << "  sd t1, 0(t0)" << std::endl;
     } else {  // arithmetic
-        // TODO
+        expr.lhs->set_gen_rvalue();
+        expr.rhs->set_gen_rvalue();
+
+        // traverse to child
+        inc_indent();
+        expr.lhs->accept(*this);
+        expr.rhs->accept(*this);
+        dec_indent();
+
+        // load lhs, rhs result into registers
+        ASM << "  ld t0, " << lhs_offset << "(fp)" << std::endl;
+        ASM << "  ld t1, " << rhs_offset << "(fp)" << std::endl;
+
+        // operator codegen
+        switch (expr.op) {
+        case op_add: ASM << "  add t0, t0, t1" << std::endl; break;
+        case op_sub: ASM << "  sub t0, t0, t1" << std::endl; break;
+        case op_mul: ASM << "  mul t0, t0, t1" << std::endl; break;
+        case op_div: ASM << "  div t0, t0, t1" << std::endl; break;
+        default: 
+            std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
+            assert(false && "unsupported operator codegen");
+        }
     }
+
+    // return value
+    if (expr.dest.is_reg()) {
+        ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
+    } else if (expr.dest.is_mem()) {
+        ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
+    }
+
+    // release temp
+    symbol_table.pop_stack(2);
+    ASM << "  addi sp, sp, " << 2*WORD_SIZE << std::endl;
+
+    ASM << "  // <<< BinaryExpression" << std::endl;
 }
 
 std::vector<std::string> arg_regs { "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7" };
@@ -268,10 +343,13 @@ std::vector<std::string> caller_preserved_registers {
 void Visitor::visit(CallExpression &expr) {
     AST << indent() << "<Call Expression>" << std::endl;
 
+    ASM << "  // CallExpression >>>" << std::endl;
+
     inc_indent();
     for (size_t i = 0; i < expr.argument_list.size(); i++) {
         auto &arg = expr.argument_list[i];
-        arg->set_save_to_reg(arg_regs[i]);
+        arg->set_save_to_reg(arg_regs[i]); 
+        arg->set_gen_rvalue(); 
         arg->accept(*this);
     }
     expr.expr->accept(*this);
@@ -284,6 +362,8 @@ void Visitor::visit(CallExpression &expr) {
     // restore caller preserved registers
     restore_regs_from_stack("caller", caller_preserved_registers);
 
+    ASM << "  // <<< CallExpression" << std::endl;
+
     dec_indent();
 }
 
@@ -291,6 +371,30 @@ void Visitor::visit(Identifier &id) {
     AST << indent() << "<Identifier>";
     AST << "[identifier = " << id.token << "]";
     AST << std::endl;
+
+    Symbol *sym = symbol_table.lookup(id.token);
+    if (sym == nullptr) return;  // probably it is id of function
+
+    int offset = sym->offset;
+
+    ASM << "  // Identifier >>>" << std::endl;
+
+    // lvalue or rvalue
+    if (id.dest.is_lvalue()) {
+        ASM << "  addi t0, fp, 0" << std::endl;
+        ASM << "  addi t0, t0, " << offset << std::endl;
+    } else if (id.dest.is_rvalue()) {
+        ASM << "  ld t0, " << offset << "(fp)" << std::endl;
+    }
+
+    // register or mem
+    if (id.dest.is_reg()) {
+        ASM << "  addi " << id.dest.reg_name << ", t0, 0" << std::endl;
+    } else if (id.dest.is_mem()) {
+        ASM << "  sd t0, " << id.dest.mem_offset << "(fp)" << std::endl;
+    }
+
+    ASM << "  // <<< Identifier" << std::endl;
 }
 
 void Visitor::visit(Literal &lit) {
@@ -298,11 +402,16 @@ void Visitor::visit(Literal &lit) {
     AST << "[value = " << lit.token << "]";
     AST << std::endl;
 
+    ASM << "  // Literal >>>" << std::endl;
+
+    // always rvalue
     if (lit.dest.is_reg()) {
         ASM << "  li " << lit.dest.reg_name << ", " << lit.token << std::endl;
-    } else {
-        // assert(false && "function unsupported yet");
-        std::cerr << "[yystype.cpp:" << __LINE__ << "] function unsupported yet" << std::endl;
+    } else if (lit.dest.is_mem()) {
+        ASM << "  li t0, " << lit.token << std::endl;
+        ASM << "  sd t0, " << lit.dest.mem_offset << "(fp)" << std::endl;
     }
+
+    ASM << "  // <<< Literal" << std::endl;
 }
 

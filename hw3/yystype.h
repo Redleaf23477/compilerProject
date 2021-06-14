@@ -89,7 +89,7 @@ struct SymbolTable {
     int frame_cnt;  // number of stuffs in current stack frame
 
     void set_frame_cnt(int size) { frame_cnt = size; }
-    void push_stack(int size) { frame_cnt += size; }
+    int push_stack(int size) { return frame_cnt += size; }
     void pop_stack(int size) { frame_cnt -= size; }
 
     void push(char *name, int scope, int size, VarMode mode, DataType type) {
@@ -158,20 +158,29 @@ struct Visitor {
 };
 
 // AST Nodes Definition
+    
+enum ValueType { lvalue, rvalue, no_value };
+
+std::string get_value_type_name(ValueType type);
 
 struct CodegenDest {
     enum Dest { reg, mem, no_gen };
-    Dest dest; // true for register, false for stack
+    Dest dest;
+    ValueType value_type;
     std::string reg_name;
     int mem_offset;  // relative to stack pointer
 
     bool is_reg() { return dest == reg; }
     bool is_mem() { return dest == mem; }
-
     void set_reg(std::string _reg) { dest = reg, std::swap(_reg, reg_name); }
     void set_mem(int _offset) { dest = mem, mem_offset = _offset; }
 
-    CodegenDest():dest(no_gen) {}
+    bool is_lvalue() { return value_type == lvalue; }
+    bool is_rvalue() { return value_type == rvalue; }
+    bool set_lvalue() { return value_type = lvalue; }
+    bool set_rvalue() { return value_type = rvalue; }
+
+    CodegenDest():dest(no_gen), value_type(no_value) {}
 };
 
 // The very base class
@@ -224,14 +233,17 @@ struct TranslationUnit : public Node {
 
 struct Declaration : public Node {
     Type *type; // scalar, atomic element of array, return type of function
+    Expression *initializer;
 
-    Declaration(char *txt):Node(txt){}
+    Declaration(char *txt):Node(txt), initializer(nullptr) {}
     virtual ~Declaration();
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
     void set_type(Type* _type) { type = _type; }
     DataType get_data_type() { return type->type; }
+
+    void set_initializer(Expression *init) { initializer = init; }
 };
 
 // Function Declaration
@@ -294,6 +306,8 @@ struct Expression : public Node {
 
     void set_save_to_reg(std::string reg) { dest.set_reg(reg); }
     void set_save_to_mem(int offset) { dest.set_mem(offset); }
+    void set_gen_lvalue() { dest.set_lvalue(); }
+    void set_gen_rvalue() { dest.set_rvalue(); }
 };
 
 struct UnaryExpression : public Expression {

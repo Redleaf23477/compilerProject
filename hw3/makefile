@@ -30,22 +30,33 @@ codegen: yystype.o y.tab.c lex.yy.cpp
 	chmod +x $@
 
 basic_test: codegen
+	@echo "=================="
+	@echo "0.c"
+	@echo "=================="
 	./codegen <Testcase/Basic/0.c
-	@echo "================"
-	@echo "AST"
-	@echo "================"
-	@cat ast.txt
-	@echo "================"
-	@echo "codegen"
-	@echo "================"
-	@cat codegen.S
-	@echo "================"
-	@echo "compile & run"
-	@echo "================"
 	${RISCV_CXX} -o codegen.o -c codegen.S
 	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
 	${SPIKE_PK} ./$@ | tee out
 	diff out Testcase/Basic/0.ans
+
+arithmetic_test: codegen
+	@echo "=================="
+	@echo "0.c"
+	@echo "=================="
+	./codegen <Testcase/ArithmeticExpression/0.c
+	${RISCV_CXX} -o codegen.o -c codegen.S
+	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	${SPIKE_PK} ./$@ | tee out
+	diff out Testcase/ArithmeticExpression/0.ans
+	@echo "=================="
+	@echo "1.c"
+	@echo "=================="
+	./codegen <Testcase/ArithmeticExpression/1.c
+	${RISCV_CXX} -o codegen.o -c codegen.S
+	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	${SPIKE_PK} ./$@ | tee out
+	diff out Testcase/ArithmeticExpression/1.ans
+
 
 test:
 	${RISCV_CXX} -o codegen.o -c codegen.S

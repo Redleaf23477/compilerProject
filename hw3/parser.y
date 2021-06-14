@@ -222,7 +222,7 @@ void codegen(Declaration*);
 %type<node> parameter_list
 %type<node> parameter_declaration
 %type<node> pointer
-%type<node> initializer
+%type<expr> initializer
 %type<node> initializer_list
 
 %start codegen
@@ -572,7 +572,7 @@ init_declarator_list
 // declare without/with copy initialization
 init_declarator
     : declarator
-    | declarator '=' initializer    // { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
+    | declarator '=' initializer   { $$ = $1; $$->set_initializer($3); cleanup($2); }
     ;
 
 // declare without/with pointer
@@ -609,7 +609,7 @@ pointer
 
 initializer
     : expression 
-    | '{' initializer_list '}'  { set($$, NOTAG, $1, $2, $3); }
+    | '{' initializer_list '}'  // { set($$, NOTAG, $1, $2, $3); }
     ;
 
 initializer_list
