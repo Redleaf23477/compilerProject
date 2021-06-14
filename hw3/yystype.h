@@ -9,6 +9,8 @@
 
 // #define YYSTYPE Node*
 
+constexpr int WORD_SIZE = 8;
+
 enum Tag {
     NOTAG,  // should not be assigned tag
     SDEC,   // scalar declaration
@@ -31,7 +33,9 @@ enum Operator {
     op_sub,
     op_mul,
     op_div,
-    op_mod
+    op_mod,
+    // Assignment
+    op_assign
 };
 
 std::string get_op_name(Operator op);
@@ -43,6 +47,7 @@ struct Type;
 struct Declaration;
 struct FuncDecl;
 struct FuncDefn;
+struct ScalarDecl;
 struct TranslationUnit;
 struct Statement;
 struct ExpressionStatement;
@@ -63,16 +68,45 @@ enum VarMode {
     M_PARAMETER
 };
 
+enum DataType {
+    T_INT,
+    T_PTR
+};
+
+std::string get_type_name(DataType type);
+
 struct Symbol {
     std::string name;
     int scope;
-    int offset;
-    VarMode mode;  // local var or parameters
-    std::vector<std::string> parameters;
+    int offset;     // w.r.t. frame base pointer
+    VarMode mode;   // local var or parameters
+    DataType type;
 };
 
 struct SymbolTable {
+
     std::vector<Symbol> table;
+    int frame_cnt;  // number of stuffs in current stack frame
+
+    void set_frame_cnt(int size) { frame_cnt = size; }
+    void push_stack(int size) { frame_cnt += size; }
+    void pop_stack(int size) { frame_cnt -= size; }
+
+    void push(char *name, int scope, int size, VarMode mode, DataType type) {
+        table.emplace_back((Symbol){name, scope, frame_cnt * WORD_SIZE, mode, type});
+        frame_cnt += size;
+    }
+    Symbol* lookup(std::string name) {
+        std::vector<Symbol>::reverse_iterator it;
+        for (it = table.rbegin(); it != table.rend(); it++) {
+            if (it->name == name) break;
+        }
+        if (it == table.rend()) return nullptr;
+        else return &(*it);
+    }
+    void clear_to_scope(int scope) {
+        while (table.size() && table.back().scope != scope) table.pop_back(), frame_cnt--;
+    }
 };
 
 struct Scope {
@@ -99,7 +133,7 @@ struct Visitor {
     std::string indent() { return std::string(ast_indent*2, ' '); }
 
     // codegen related member
-    SymbolTable table;
+    SymbolTable symbol_table;
     Scope scope;
     void save_regs_on_stack(std::string whom, std::vector<std::string> &regs);
     void restore_regs_from_stack(std::string whom, std::vector<std::string> &regs);
@@ -112,6 +146,7 @@ struct Visitor {
     void visit(Declaration &);
     void visit(FuncDecl &);
     void visit(FuncDefn &);
+    void visit(ScalarDecl &);
     void visit(Statement &);
     void visit(ExpressionStatement &);
     void visit(Expression &);
@@ -166,10 +201,6 @@ struct NodeList : public Node {
 };
 
 // Type class
-
-enum DataType {
-    int_type
-};
 
 struct Type : public Node {
     DataType type;
@@ -226,6 +257,14 @@ struct FuncDefn : public FuncDecl {
     ~FuncDefn();
 };
 
+// variable declaration
+
+struct ScalarDecl : public Declaration {
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+    ScalarDecl(char* str):Declaration(str) {}
+};
+
 // Statement Base Class
 
 struct Statement : public Node {
@@ -274,7 +313,7 @@ struct BinaryExpression : public Expression {
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
     BinaryExpression(Operator _op, Expression *_lhs, Expression *_rhs):op(_op), lhs(_lhs), rhs(_rhs) {}
-    ~BinaryExpression(); 
+    virtual ~BinaryExpression(); 
 };
 
 struct CallExpression : public UnaryExpression {

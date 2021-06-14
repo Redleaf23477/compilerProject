@@ -51,6 +51,7 @@ test:
 	${RISCV_CXX} -o codegen.o -c codegen.S
 	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
 	${SPIKE_PK} ./$@
+	rm -f ./$@
 	
 
 .PHONY: clean

@@ -29,18 +29,29 @@ std::string get_op_name(Operator op) {
     case op_sub: return "sub";
     case op_mul: return "mul";
     case op_div: return "div";
+    case op_assign: return "assign";
     }
     std::cerr << "unrecognized op code: " << static_cast<int>(op) << std::endl;
     assert (false && "invalid operator");
     return "unreachable";
 }
 
+std::string get_type_name(DataType type) {
+    switch (type) {
+    case T_INT: return "int";
+    case T_PTR: return "int*";
+    }
+    std::cerr << "unrecognized data type: " << static_cast<int>(type) << std::endl;
+    assert (false && "invalid data type");
+    return "unreachable";
+}
+
 void Visitor::save_regs_on_stack(std::string whom, std::vector<std::string> &regs) {
     ASM << "  // " << whom << " saves registers >>>" << std::endl;
-    ASM << "  addi sp, sp, " << -8 * (int)regs.size() << std::endl;
+    ASM << "  addi sp, sp, " << -WORD_SIZE * (int)regs.size() << std::endl;
     for (size_t i = 0; i < regs.size(); i++) {
         auto &reg = regs[i];
-        ASM << "  sd " << reg << ", " << 8*i << "(sp)" << std::endl;
+        ASM << "  sd " << reg << ", " << WORD_SIZE * i << "(sp)" << std::endl;
     }
     ASM << "  // <<<" << std::endl;
 }
@@ -49,9 +60,9 @@ void Visitor::restore_regs_from_stack(std::string whom, std::vector<std::string>
     ASM << "  // " << whom << " restores registers >>>" << std::endl;
     for (size_t i = 0; i < regs.size(); i++) {
         auto &reg = regs[i];
-        ASM << "  ld " << reg << ", " << 8*i << "(sp)" << std::endl;
+        ASM << "  ld " << reg << ", " << WORD_SIZE * i << "(sp)" << std::endl;
     }
-    ASM << "  addi sp, sp, " << 8 * (int)regs.size() << std::endl;
+    ASM << "  addi sp, sp, " << WORD_SIZE * (int)regs.size() << std::endl;
     ASM << "  // <<<" << std::endl;
 }
 
@@ -140,14 +151,14 @@ void Visitor::visit(TranslationUnit &unit) {
 
 void Visitor::visit(Declaration &decl) {
     AST << indent() << "<Declaration>";
-    if (decl.get_data_type() == int_type) AST << "[type: int]";
+    AST << "[type: " << get_type_name(decl.get_data_type()) << "]";
     AST << "[declaration name: " << decl.token << "]";
     AST << std::endl;
 }
 
 void Visitor::visit(FuncDecl &decl) {
     AST << indent() << "<Function Declaration>";
-    if (decl.get_data_type() == int_type) AST << "[return: int]";
+    AST << "[return: " << get_type_name(decl.get_data_type()) << "]";
     AST << "[function name: " << decl.token << "]";
     AST << "[parameters: ]";
     AST << std::endl;
@@ -158,7 +169,7 @@ std::vector<std::string> callee_preserved_registers {
 
 void Visitor::visit(FuncDefn &defn) {
     AST << indent() << "<Function Definition>";
-    if (defn.get_data_type() == int_type) AST << "[return: int]";
+    AST << "[return: " << get_type_name(defn.get_data_type()) << "]";
     AST << "[function name: " << defn.token << "]";
     AST << "[parameters: ]";
     AST << std::endl;
@@ -169,8 +180,10 @@ void Visitor::visit(FuncDefn &defn) {
 
     // store callee preserved registers
     save_regs_on_stack("callee", callee_preserved_registers);
+    symbol_table.push_stack(callee_preserved_registers.size());
     // set new frame
     ASM << "  addi s0, sp, 104" << std::endl;
+
 
     inc_indent();
     scope.enter();
@@ -179,10 +192,30 @@ void Visitor::visit(FuncDefn &defn) {
     scope.leave();
 
     // restore callee preserved registers
+    ASM << "  // release local variables" << std::endl;
+    ASM << "  addi sp, sp, " << WORD_SIZE * (symbol_table.frame_cnt - callee_preserved_registers.size()) << std::endl;
     restore_regs_from_stack("callee", callee_preserved_registers);
+    symbol_table.pop_stack(callee_preserved_registers.size());
 
     // return
     ASM << "  jalr x0, 0(ra)" << std::endl;
+}
+
+void Visitor::visit(ScalarDecl &decl) {
+    // push into symbol table
+    symbol_table.push(decl.token, scope.get_scope(), 1, M_LOCAL, decl.get_data_type());
+    Symbol *sym = symbol_table.lookup(decl.token);
+    assert(sym != nullptr && "symbol not found");
+
+    AST << indent() << "<Scalar Declaration>";
+    AST << "[variable name = " << decl.token << "]";
+    AST << "[type = " << get_type_name(decl.get_data_type()) << "]";
+    AST << "{scope = " << sym->scope << "}";
+    AST << "{offset = " << sym->offset << "}";
+    AST << std::endl;
+
+    // codegen: simply grow the stack
+    ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
 }
 
 void Visitor::visit(Statement &stmt) {
@@ -220,6 +253,12 @@ void Visitor::visit(BinaryExpression &expr) {
     expr.lhs->accept(*this);
     expr.rhs->accept(*this);
     dec_indent();
+
+    if (expr.op == op_assign) {
+        // TODO
+    } else {  // arithmetic
+        // TODO
+    }
 }
 
 std::vector<std::string> arg_regs { "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7" };
@@ -262,7 +301,8 @@ void Visitor::visit(Literal &lit) {
     if (lit.dest.is_reg()) {
         ASM << "  li " << lit.dest.reg_name << ", " << lit.token << std::endl;
     } else {
-        assert(false && "function unsupported yet");
+        // assert(false && "function unsupported yet");
+        std::cerr << "[yystype.cpp:" << __LINE__ << "] function unsupported yet" << std::endl;
     }
 }
 

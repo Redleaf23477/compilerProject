@@ -510,7 +510,7 @@ logical_or_expression
 
 assignment_expression
     : logical_or_expression
-    | logical_or_expression '=' assignment_expression //{ set($$, EXPR, $1, $2, $3); }
+    | logical_or_expression '=' assignment_expression   { $$ = new BinaryExpression(op_assign, $1, $3); cleanup($2); }
     ;
 
 // lowest precedence, includes everything
@@ -534,7 +534,7 @@ declaration
 // forget about type and const, supporting 64-bit int only
 declaration_specifiers
       /* e.g. int */
-    : type_specifier { $$ = new Type(int_type); cleanup($1); }  // TODO
+    : type_specifier { $$ = new Type(T_INT); cleanup($1); }  // TODO
       /* e.g. signed int */
     | type_specifier declaration_specifiers
       /* i.e. const */
@@ -585,7 +585,7 @@ declarator
 
 // declare the name of variable
 direct_declarator
-    : IDENTIFIER                            //{ $$ = $1, set_hint($$, SDEC); }
+    : IDENTIFIER                            { $$ = new ScalarDecl($1->token); cleanup($1); }
     | IDENTIFIER '(' ')'                    { $$ = new FuncDecl($1->token); cleanup($1, $2, $3); }
     | IDENTIFIER '(' parameter_list ')'     //{ set($$, NOTAG, $1, $2, $3, $4), set_hint($$, FDEC); }
     | direct_declarator '[' expression ']'  //{ set($$, NOTAG, $1, $2, $3, $4), set_hint($$, ADEC); }
