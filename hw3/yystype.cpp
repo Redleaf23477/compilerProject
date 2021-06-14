@@ -388,6 +388,11 @@ void Visitor::visit(BinaryExpression &expr) {
         case op_sub: ASM << "  sub t0, t0, t1" << std::endl; break;
         case op_mul: ASM << "  mul t0, t0, t1" << std::endl; break;
         case op_div: ASM << "  div t0, t0, t1" << std::endl; break;
+        case op_lt: ASM << "  slt t0, t0, t1" << std::endl; break;
+        case op_eq: 
+            ASM << "  sub t0, t0, t1" << std::endl;
+            ASM << "  seqz t0, t0" << std::endl;
+            break;
         default: 
             std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
             assert(false && "unsupported binary operator codegen");
