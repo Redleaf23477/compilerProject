@@ -282,7 +282,9 @@ void Visitor::visit(Statement &stmt) {
 }
 
 void Visitor::visit(CompoundStatement &stmt) {
-    AST << indent() << "<Compund Statement" << std::endl;
+    AST << indent() << "<Compund Statement>" << std::endl;
+
+    // nothing to codegen :)
 
     inc_indent();
     scope.enter();
@@ -294,11 +296,44 @@ void Visitor::visit(CompoundStatement &stmt) {
 void Visitor::visit(IfStatement &if_stmt) {
     AST << indent() << "<If Statement>" << std::endl;
 
+    ASM << "  // IfStatement >>>" << std::endl;
+
+    new_if_label_set();
+
+    // allocate temp for cond
+    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    if_stmt.cond->set_save_to_mem(cond_offset);
+    if_stmt.cond->set_gen_rvalue();
+    ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
+
+    // fall-through implementation
+
+    // traverse child (cond)
     inc_indent();
     if_stmt.cond->accept(*this);
+
+    ASM << "  ld t0, " << cond_offset << "(fp)" << std::endl; // t0 = cond
+    ASM << "  beqz t0, " << label_else() << std::endl;  // !cond then goto else
+
+    // traverse child (if_body)
     if_stmt.if_body->accept(*this);
+    if (if_stmt.else_body) ASM << "  j " << label_end_if() << std::endl;
+
+    ASM << label_else() << ":" << std::endl;
+
+    // traverse child (else_body)
     if (if_stmt.else_body) if_stmt.else_body->accept(*this);
+
+    ASM << label_end_if() << ":" << std::endl;
+
+    // traverse end
     dec_indent();
+
+    // release temp
+    symbol_table.pop_stack(1);
+    ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
+
+    ASM << "  // <<< IfStatement" << std::endl;
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {

@@ -152,8 +152,14 @@ struct Visitor {
     void save_regs_on_stack(std::string whom, std::vector<std::string> &regs);
     void restore_regs_from_stack(std::string whom, std::vector<std::string> &regs);
 
+    // codegen label maintainer
+    int if_cnt;
+    void new_if_label_set() { ++if_cnt; }
+    std::string label_else() { char buff[30]; sprintf(buff, "else_%d", if_cnt); return std::string(buff); }
+    std::string label_end_if() { char buff[30]; sprintf(buff, "endif_%d", if_cnt); return std::string(buff); }
+
     // constructor & visitor pattern
-    Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0) {}
+    Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0), if_cnt(0) {}
 
     void visit(Node &);
     void visit(TranslationUnit &);
