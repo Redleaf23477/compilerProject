@@ -250,11 +250,21 @@ void Visitor::visit(ScalarDecl &decl) {
 }
 
 void Visitor::visit(ArrayDecl &decl) {
+    // push into symbol table
+    symbol_table.push(decl.token, scope.get_scope(), decl.array_size, M_LOCAL, decl.get_data_type());
+    Symbol *sym = symbol_table.lookup(decl.token);
+    assert(sym != nullptr && "symbol not found");
+
     AST << indent() << "<Array Declaration>";
     AST << "[variable name = " << decl.token << "]";
     AST << "[element type = " << get_type_name(decl.get_data_type()) << "]";
     AST << "[array size = " << decl.array_size << "]";
+    AST << "{scope = " << sym->scope << "}";
+    AST << "{offset = " << sym->offset << "}";
     AST << std::endl;
+
+    // codegen: simply grow the stack
+    ASM << "  addi sp, sp, " << -decl.array_size * WORD_SIZE << std::endl;
 
     // note: there is no array initializer in the test cases, forget about them
 }
@@ -449,10 +459,47 @@ void Visitor::visit(CallExpression &expr) {
 void Visitor::visit(ArraySubscriptExpression &expr) {
     AST << indent() << "<Array Subscript Expression>" << std::endl;
 
+    ASM << "  // ArraySubscriptExpression >>>" << std::endl;
+
+    // allocate temp
+    int expr_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int subscript_offset = symbol_table.push_stack(1) * WORD_SIZE; 
+    expr.expr->set_save_to_mem(expr_offset);
+    expr.subscript->set_save_to_mem(subscript_offset);
+    ASM << "  addi sp, sp, " << -2*WORD_SIZE << std::endl;
+
+    expr.expr->set_gen_lvalue();
+    expr.subscript->set_gen_rvalue();
+
+    // traverse to child
     inc_indent();
     expr.expr->accept(*this);
     expr.subscript->accept(*this);
     dec_indent();
+
+    // load into register
+    ASM << "  ld t0, " << expr_offset << "(fp)" << std::endl;
+    ASM << "  ld t1, " << subscript_offset << "(fp)" << std::endl;
+
+    // operator codegen
+    ASM << "  slli t1, t1, " << LG_WORD_SIZE << std::endl;
+    ASM << "  add t0, t0, t1" << std::endl;
+
+    // cast to rvalue if needed
+    if (expr.dest.is_rvalue()) ASM << "  ld t0, 0(t0)" << std::endl;
+
+    // return value
+    if (expr.dest.is_reg()) {
+        ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
+    } else if (expr.dest.is_mem()) {
+        ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
+    }
+
+    // release temp
+    symbol_table.pop_stack(2);
+    ASM << "  addi sp, sp, " << 2*WORD_SIZE << std::endl;
+
+    ASM << "  // <<< ArraySubscriptExpression" << std::endl;
 }
 
 void Visitor::visit(Identifier &id) {

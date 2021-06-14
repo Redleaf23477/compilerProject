@@ -10,6 +10,7 @@
 // #define YYSTYPE Node*
 
 constexpr int WORD_SIZE = 8;
+constexpr int LG_WORD_SIZE = 3;
 
 enum Tag {
     NOTAG,  // should not be assigned tag
