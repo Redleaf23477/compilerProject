@@ -22,6 +22,19 @@ std::string tag2str(Tag t) {
     }
 }
 
+std::string get_op_name(Operator op) {
+    switch (op) {
+    case op_call: return "function call";
+    case op_add: return "add";
+    case op_sub: return "sub";
+    case op_mul: return "mul";
+    case op_div: return "div";
+    }
+    std::cerr << "unrecognized op code: " << static_cast<int>(op) << std::endl;
+    assert (false && "invalid operator");
+    return "unreachable";
+}
+
 void Visitor::save_regs_on_stack(std::string whom, std::vector<std::string> &regs) {
     ASM << "  // " << whom << " saves registers >>>" << std::endl;
     ASM << "  addi sp, sp, " << -8 * (int)regs.size() << std::endl;
@@ -88,6 +101,11 @@ ExpressionStatement::~ExpressionStatement() {
 
 UnaryExpression::~UnaryExpression() {
     delete expr;
+}
+
+BinaryExpression::~BinaryExpression() {
+    delete lhs;
+    delete rhs;
 }
 
 CallExpression::~CallExpression() {
@@ -185,11 +203,22 @@ void Visitor::visit(Expression &expr) {
 
 void Visitor::visit(UnaryExpression &expr) {
     AST << indent() << "<Unary Expression>";
-    AST << "[op = " << expr.op << "]";
+    AST << "[op = " << get_op_name(expr.op) << "]";
     AST << std::endl;
 
     inc_indent();
     expr.expr->accept(*this);
+    dec_indent();
+}
+
+void Visitor::visit(BinaryExpression &expr) {
+    AST << indent() << "<Binary Expression>";
+    AST << "[op = " << get_op_name(expr.op) << "]";
+    AST << std::endl;
+
+    inc_indent();
+    expr.lhs->accept(*this);
+    expr.rhs->accept(*this);
     dec_indent();
 }
 

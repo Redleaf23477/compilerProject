@@ -1,6 +1,7 @@
 #ifndef YYSTYPE_H_
 #define YYSTYPE_H_
 
+#include <cassert>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -20,6 +21,21 @@ enum Tag {
 
 std::string tag2str(Tag t);
 
+// Operators
+
+enum Operator {
+    // Function Call
+    op_call,
+    // Arithmetic
+    op_add,
+    op_sub,
+    op_mul,
+    op_div,
+    op_mod
+};
+
+std::string get_op_name(Operator op);
+
 // AST Nodes Declaration
 
 struct Node;
@@ -32,6 +48,7 @@ struct Statement;
 struct ExpressionStatement;
 struct Expression;
 struct UnaryExpression;
+struct BinaryExpression;
 struct CallExpression;
 struct Identifier;
 struct Literal;
@@ -99,6 +116,7 @@ struct Visitor {
     void visit(ExpressionStatement &);
     void visit(Expression &);
     void visit(UnaryExpression &);
+    void visit(BinaryExpression &);
     void visit(CallExpression &);
     void visit(Identifier &);
     void visit(Literal &);
@@ -201,7 +219,6 @@ struct FuncDefn : public FuncDecl {
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    // TODO: support more than one stmt
     FuncDefn(Type* _type, char *str, NodeList<Node*> *body = nullptr):FuncDecl(str) { 
         set_type(_type); 
         if (body) std::swap(body->arr, func_body);
@@ -241,13 +258,23 @@ struct Expression : public Node {
 };
 
 struct UnaryExpression : public Expression {
-    int op;
+    Operator op;
     Expression *expr;
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    UnaryExpression(int _op, Expression *_expr):op(_op), expr(_expr) {}
+    UnaryExpression(Operator _op, Expression *_expr):op(_op), expr(_expr) {}
     virtual ~UnaryExpression();
+};
+
+struct BinaryExpression : public Expression { 
+    Operator op;
+    Expression *lhs, *rhs;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+
+    BinaryExpression(Operator _op, Expression *_lhs, Expression *_rhs):op(_op), lhs(_lhs), rhs(_rhs) {}
+    ~BinaryExpression(); 
 };
 
 struct CallExpression : public UnaryExpression {
@@ -256,7 +283,7 @@ struct CallExpression : public UnaryExpression {
     void accept(Visitor &visitor) { visitor.visit(*this); }
     void set_argument_list(NodeList<Expression*> *nl) { std::swap(nl->arr, argument_list); }
 
-    CallExpression(Expression *_expr, NodeList<Expression*> *nl = nullptr):UnaryExpression(7122, _expr) {
+    CallExpression(Expression *_expr, NodeList<Expression*> *nl = nullptr):UnaryExpression(op_call, _expr) {
         if (nl != nullptr) set_argument_list(nl); 
     }
     ~CallExpression();

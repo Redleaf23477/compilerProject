@@ -382,7 +382,7 @@ statement_declaration_list
 primary_expression
     : IDENTIFIER            { $$ = new Identifier($1->token); cleanup($1); }
     | LITERAL               { $$ = new Literal($1->token); cleanup($1); }
-    | '(' expression ')'    //{ set($$, EXPR, $1, $2, $3); }
+    | '(' expression ')'    { $$ = $2; cleanup($1, $3); }  // unhealthy though, should be Parentheses Expression
     ;
 
     /* Right precedence (Right to Left) */
@@ -449,15 +449,15 @@ specifier_qualifier_list
 
 multiplicative_expression
     : prefix_expression
-    | multiplicative_expression '*' prefix_expression //{ set($$, EXPR, $1, $2, $3); }
-    | multiplicative_expression '/' prefix_expression //{ set($$, EXPR, $1, $2, $3); }
-    | multiplicative_expression '%' prefix_expression //{ set($$, EXPR, $1, $2, $3); }
+    | multiplicative_expression '*' prefix_expression       { $$ = new BinaryExpression(op_mul, $1, $3); cleanup($2); }
+    | multiplicative_expression '/' prefix_expression       { $$ = new BinaryExpression(op_div, $1, $3); cleanup($2); }
+    | multiplicative_expression '%' prefix_expression       { $$ = new BinaryExpression(op_mod, $1, $3); cleanup($2); }
     ;
 
 additive_expression
     : multiplicative_expression
-    | additive_expression '+' multiplicative_expression //{ set($$, EXPR, $1, $2, $3); }
-    | additive_expression '-' multiplicative_expression //{ set($$, EXPR, $1, $2, $3); }
+    | additive_expression '+' multiplicative_expression     { $$ = new BinaryExpression(op_add, $1, $3); cleanup($2); }
+    | additive_expression '-' multiplicative_expression     { $$ = new BinaryExpression(op_sub, $1, $3); cleanup($2); }
     ;
 
 shift_expression
