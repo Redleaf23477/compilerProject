@@ -46,6 +46,7 @@ std::string get_type_name(DataType type) {
     switch (type) {
     case T_INT: return "int";
     case T_PTR: return "int*";
+    case T_ARR: return "int[]";
     }
     std::cerr << "unrecognized data type: " << static_cast<int>(type) << std::endl;
     assert (false && "invalid data type");
@@ -265,7 +266,7 @@ void Visitor::visit(ScalarDecl &decl) {
 void Visitor::visit(ArrayDecl &decl) {
     // push into symbol table
     // Note: Spec doesn't support multi-level-pointer, so array is always `int arr[X]`
-    symbol_table.push(decl.token, scope.get_scope(), decl.array_size, M_LOCAL, T_PTR); 
+    symbol_table.push(decl.token, scope.get_scope(), decl.array_size, M_LOCAL, T_ARR); 
     Symbol *sym = symbol_table.lookup(decl.token);
     assert(sym != nullptr && "symbol not found");
 
@@ -288,7 +289,9 @@ void Visitor::visit(Statement &stmt) {
 }
 
 void Visitor::visit(CompoundStatement &stmt) {
-    AST << indent() << "<Compund Statement>" << std::endl;
+    AST << indent() << "<Compund Statement>";
+    AST << "[scope = " << scope.get_scope() << "]";
+    AST << std::endl;
 
     // nothing to codegen :)
 
@@ -296,11 +299,16 @@ void Visitor::visit(CompoundStatement &stmt) {
     scope.enter();
     for (auto c : stmt.stmt_decl_list) c->accept(*this);
     dec_indent();
-    scope.leave();
+    int recovered_scope = scope.leave();
+    int removed_local_cnt = symbol_table.clear_to_scope(recovered_scope);
+    ASM << "  // clear local variable" << std::endl;
+    ASM << "  addi sp, sp, " << removed_local_cnt * WORD_SIZE << std::endl;
 }
 
 void Visitor::visit(IfStatement &if_stmt) {
-    AST << indent() << "<If Statement>" << std::endl;
+    AST << indent() << "<If Statement>";
+    AST << "[scope = " << scope.get_scope() << "]";
+    AST << std::endl;
 
     ASM << "  // IfStatement >>>" << std::endl;
 
@@ -318,7 +326,7 @@ void Visitor::visit(IfStatement &if_stmt) {
     inc_indent();
     if_stmt.cond->accept(*this);
 
-    ASM << "  ld t0, " << cond_offset << "(fp)" << std::endl; // t0 = cond
+    ASM << "  ld t0, " << -cond_offset << "(fp)" << std::endl; // t0 = cond
     ASM << "  beqz t0, " << label_else(if_idx) << std::endl;  // !cond then goto else
 
     // traverse child (if_body)
@@ -343,7 +351,9 @@ void Visitor::visit(IfStatement &if_stmt) {
 }
 
 void Visitor::visit(DoStatement &do_stmt) {
-    AST << indent() << "<Do While Statement>" << std::endl;
+    AST << indent() << "<Do While Statement>";
+    AST << "[scope = " << scope.get_scope() << "]";
+    AST << std::endl;
 
     ASM << "  // DoStatement >>>" << std::endl;
 
@@ -365,7 +375,7 @@ void Visitor::visit(DoStatement &do_stmt) {
     ASM << label_loop_continue(loop_idx) << ":" << std::endl;
     do_stmt.cond->accept(*this);
     
-    ASM << "  ld t0, " << cond_offset << "(fp)" << std::endl;
+    ASM << "  ld t0, " << -cond_offset << "(fp)" << std::endl;
     ASM << "  bnez t0, " << label_loop_start(loop_idx) << std::endl;
 
     dec_indent();
@@ -381,7 +391,9 @@ void Visitor::visit(DoStatement &do_stmt) {
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {
-    AST << indent() << "<Expression Statement>" << std::endl;
+    AST << indent() << "<Expression Statement>";
+    AST << "[scope = " << scope.get_scope() << "]";
+    AST << std::endl;
 
     inc_indent();
     expr_stmt.expr->accept(*this);
@@ -419,7 +431,7 @@ void Visitor::visit(UnaryExpression &expr) {
 
     // codegen
     // load result into register
-    ASM << "  ld t0, " << tmp_offset << "(fp)" << std::endl;
+    ASM << "  ld t0, " << -tmp_offset << "(fp)" << std::endl;
 
     // operator codegen
     switch (expr.op) {
@@ -441,7 +453,7 @@ void Visitor::visit(UnaryExpression &expr) {
     if (expr.dest.is_reg()) {
         ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
     } else if (expr.dest.is_mem()) {
-        ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
+        ASM << "  sd t0, " << -expr.dest.mem_offset << "(fp)" << std::endl;
     }
 
     // return type
@@ -453,6 +465,8 @@ void Visitor::visit(UnaryExpression &expr) {
         std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
         assert(false && "unsupported unary operator (return type unknown)");
     }
+
+    AST << indent() << "--> [return type: " << get_type_name(expr.return_type) << "]" << std::endl;
 
     // release temp
     symbol_table.pop_stack(1);
@@ -476,65 +490,21 @@ void Visitor::visit(BinaryExpression &expr) {
     expr.rhs->set_save_to_mem(rhs_offset);
     ASM << "  addi sp, sp, " << -2*WORD_SIZE << std::endl;
 
+    // set child lvalue, rvalue
     if (expr.op == op_assign) {
         expr.lhs->set_gen_lvalue();
         expr.rhs->set_gen_rvalue();
-
-        // traverse to child
-        inc_indent();
-        expr.lhs->accept(*this);
-        expr.rhs->accept(*this);
-        dec_indent();
-
-        // load lhs, rhs result into registers
-        ASM << "  ld t0, " << lhs_offset << "(fp)" << std::endl;
-        ASM << "  ld t1, " << rhs_offset << "(fp)" << std::endl;
-
-        // operator codegen
-        ASM << "  sd t1, 0(t0)" << std::endl;
-
-        // cast to rvalue if needed
-        if (expr.dest.is_rvalue()) ASM << "  addi t0, t1, 0" << std::endl;
-    } else {  // arithmetic
+    } else {
         expr.lhs->set_gen_rvalue();
         expr.rhs->set_gen_rvalue();
-
-        // traverse to child
-        inc_indent();
-        expr.lhs->accept(*this);
-        expr.rhs->accept(*this);
-        dec_indent();
-
-        // load lhs, rhs result into registers
-        ASM << "  ld t0, " << lhs_offset << "(fp)" << std::endl;
-        ASM << "  ld t1, " << rhs_offset << "(fp)" << std::endl;
-
-        // operator codegen
-        switch (expr.op) {
-        case op_add: ASM << "  add t0, t0, t1" << std::endl; break;
-        case op_sub: ASM << "  sub t0, t0, t1" << std::endl; break;
-        case op_mul: ASM << "  mul t0, t0, t1" << std::endl; break;
-        case op_div: ASM << "  div t0, t0, t1" << std::endl; break;
-        case op_lt: ASM << "  slt t0, t0, t1" << std::endl; break;
-        case op_eq: 
-            ASM << "  sub t0, t0, t1" << std::endl;
-            ASM << "  seqz t0, t0" << std::endl;
-            break;
-        default: 
-            std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
-            assert(false && "unsupported binary operator (codegen)");
-        }
-
-        // Note: arithmetic operator should always be rvalue
     }
 
-    // return value
-    if (expr.dest.is_reg()) {
-        ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
-    } else if (expr.dest.is_mem()) {
-        ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
-    }
-
+    // traverse to child
+    inc_indent();
+    expr.lhs->accept(*this);
+    expr.rhs->accept(*this);
+    dec_indent();
+    
     // return type
     switch (expr.op) {
     case op_add: case op_sub:
@@ -554,6 +524,58 @@ void Visitor::visit(BinaryExpression &expr) {
     AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]";
     AST << std::endl;
 
+    // load lhs, rhs result into registers
+    ASM << "  ld t0, " << -lhs_offset << "(fp)" << std::endl;
+    ASM << "  ld t1, " << -rhs_offset << "(fp)" << std::endl;
+
+    // operator codegen
+    if (expr.op == op_assign) {
+        ASM << "  sd t1, 0(t0)" << std::endl;
+
+        // cast to rvalue if needed
+        if (expr.dest.is_rvalue()) ASM << "  addi t0, t1, 0" << std::endl;
+    } else if (expr.return_type == T_INT) {  // arithmetic
+        switch (expr.op) {
+        case op_add: ASM << "  add t0, t0, t1" << std::endl; break;
+        case op_sub: ASM << "  sub t0, t0, t1" << std::endl; break;
+        case op_mul: ASM << "  mul t0, t0, t1" << std::endl; break;
+        case op_div: ASM << "  div t0, t0, t1" << std::endl; break;
+        case op_lt: ASM << "  slt t0, t0, t1" << std::endl; break;
+        case op_eq: 
+            ASM << "  sub t0, t0, t1" << std::endl;
+            ASM << "  seqz t0, t0" << std::endl;
+            break;
+        default: 
+            std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
+            assert(false && "unsupported binary operator (codegen)");
+        }
+
+        // Note: arithmetic operator should always be rvalue
+
+    } else {  // pointer int + -
+        std::string ptr_reg = (expr.lhs->return_type == T_PTR? "t0" : "t1");
+        std::string int_reg = (expr.lhs->return_type == T_INT? "t0" : "t1");
+
+        ASM << "  slli " << int_reg << ", " << int_reg << ", " << LG_WORD_SIZE << std::endl;
+        
+        // Note that arr is on higher address, while arr+n is on lower address
+        switch (expr.op) {
+        case op_add: ASM << "  add t0, " << ptr_reg << ", " << int_reg << std::endl; break;
+        case op_sub: ASM << "  sub t0, " << ptr_reg << ", " << int_reg << std::endl; break;
+        default: 
+            std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
+            assert(false && "unsupported binary operator (codegen)");
+        }
+
+    }
+
+    // return value
+    if (expr.dest.is_reg()) {
+        ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
+    } else if (expr.dest.is_mem()) {
+        ASM << "  sd t0, " << -expr.dest.mem_offset << "(fp)" << std::endl;
+    }
+
     // release temp
     symbol_table.pop_stack(2);
     ASM << "  addi sp, sp, " << 2*WORD_SIZE << std::endl;
@@ -570,7 +592,6 @@ void Visitor::visit(CallExpression &expr) {
     // forget about function returning pointer
     expr.return_type = T_INT;
     AST << indent() << "<Call Expression>" << std::endl;
-    AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]" << std::endl;
 
     ASM << "  // CallExpression >>>" << std::endl;
 
@@ -594,6 +615,7 @@ void Visitor::visit(CallExpression &expr) {
     ASM << "  // <<< CallExpression" << std::endl;
 
     dec_indent();
+    AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]" << std::endl;
 }
 
 void Visitor::visit(ArraySubscriptExpression &expr) {
@@ -601,7 +623,6 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
     expr.return_type = T_INT; 
 
     AST << indent() << "<Array Subscript Expression>" << std::endl;
-    AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]" << std::endl;
 
     ASM << "  // ArraySubscriptExpression >>>" << std::endl;
 
@@ -612,7 +633,7 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
     expr.subscript->set_save_to_mem(subscript_offset);
     ASM << "  addi sp, sp, " << -2*WORD_SIZE << std::endl;
 
-    expr.expr->set_gen_lvalue();
+    expr.expr->set_gen_rvalue();
     expr.subscript->set_gen_rvalue();
 
     // traverse to child
@@ -621,9 +642,11 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
     expr.subscript->accept(*this);
     dec_indent();
 
+    AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]" << std::endl;
+
     // load into register
-    ASM << "  ld t0, " << expr_offset << "(fp)" << std::endl;
-    ASM << "  ld t1, " << subscript_offset << "(fp)" << std::endl;
+    ASM << "  ld t0, " << -expr_offset << "(fp)" << std::endl;
+    ASM << "  ld t1, " << -subscript_offset << "(fp)" << std::endl;
 
     // operator codegen
     ASM << "  slli t1, t1, " << LG_WORD_SIZE << std::endl;
@@ -636,7 +659,7 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
     if (expr.dest.is_reg()) {
         ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
     } else if (expr.dest.is_mem()) {
-        ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
+        ASM << "  sd t0, " << -expr.dest.mem_offset << "(fp)" << std::endl;
     }
 
     // release temp
@@ -649,7 +672,7 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
 void Visitor::visit(Identifier &id) {
     Symbol *sym = symbol_table.lookup(id.token);
     if (sym == nullptr) return;  // probably it is id of function
-    id.return_type = sym->type;
+    id.return_type = (sym->type == T_ARR? T_PTR : sym->type);
 
     AST << indent() << "<Identifier>";
     AST << "[identifier = " << id.token << "]";
@@ -661,18 +684,20 @@ void Visitor::visit(Identifier &id) {
     ASM << "  // Identifier >>>" << std::endl;
 
     // lvalue or rvalue
-    if (id.dest.is_lvalue()) {
-        ASM << "  addi t0, fp, 0" << std::endl;
-        ASM << "  addi t0, t0, " << offset << std::endl;
+    if (sym->type == T_ARR) {
+        // array type can only be r_value, return base address
+        ASM << "  addi t0, fp, " << -offset << std::endl;
+    } else if (id.dest.is_lvalue()) {
+        ASM << "  addi t0, fp, " << -offset << std::endl;
     } else if (id.dest.is_rvalue()) {
-        ASM << "  ld t0, " << offset << "(fp)" << std::endl;
+        ASM << "  ld t0, " << -offset << "(fp)" << std::endl;
     }
 
     // register or mem
     if (id.dest.is_reg()) {
         ASM << "  addi " << id.dest.reg_name << ", t0, 0" << std::endl;
     } else if (id.dest.is_mem()) {
-        ASM << "  sd t0, " << id.dest.mem_offset << "(fp)" << std::endl;
+        ASM << "  sd t0, " << -id.dest.mem_offset << "(fp)" << std::endl;
     }
 
     ASM << "  // <<< Identifier" << std::endl;
@@ -693,7 +718,7 @@ void Visitor::visit(Literal &lit) {
         ASM << "  li " << lit.dest.reg_name << ", " << lit.token << std::endl;
     } else if (lit.dest.is_mem()) {
         ASM << "  li t0, " << lit.token << std::endl;
-        ASM << "  sd t0, " << lit.dest.mem_offset << "(fp)" << std::endl;
+        ASM << "  sd t0, " << -lit.dest.mem_offset << "(fp)" << std::endl;
     }
 
     ASM << "  // <<< Literal" << std::endl;

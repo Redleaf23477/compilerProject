@@ -84,8 +84,9 @@ enum VarMode {
 };
 
 enum DataType {
-    T_INT,
-    T_PTR
+    T_INT, // int
+    T_PTR, // int*
+    T_ARR  // int[]
 };
 
 std::string get_type_name(DataType type);
@@ -93,6 +94,7 @@ std::string get_type_name(DataType type);
 struct Symbol {
     std::string name;
     int scope;
+    int size;       // number of element (e.g. 1 for scalar, array size for array)
     int offset;     // w.r.t. frame base pointer
     VarMode mode;   // local var or parameters
     DataType type;
@@ -108,8 +110,8 @@ struct SymbolTable {
     void pop_stack(int size) { frame_cnt -= size; }
 
     void push(char *name, int scope, int size, VarMode mode, DataType type) {
-        table.emplace_back((Symbol){name, scope, frame_cnt * WORD_SIZE, mode, type});
         frame_cnt += size;
+        table.emplace_back((Symbol){name, scope, size, frame_cnt * WORD_SIZE, mode, type});
     }
     Symbol* lookup(std::string name) {
         std::vector<Symbol>::reverse_iterator it;
@@ -119,8 +121,14 @@ struct SymbolTable {
         if (it == table.rend()) return nullptr;
         else return &(*it);
     }
-    void clear_to_scope(int scope) {
-        while (table.size() && table.back().scope != scope) table.pop_back(), frame_cnt--;
+    int clear_to_scope(int scope) {
+        int remove_cnt = 0;
+        while (table.size() && table.back().scope > scope) {
+            frame_cnt -= table.back().size; 
+            remove_cnt += table.back().size;
+            table.pop_back();
+        }
+        return remove_cnt;
     }
 };
 
@@ -264,6 +272,7 @@ struct Type : public Node {
     Type(DataType _type):type(_type) {}
     void add(Type *_type) {
         if (_type->type == T_PTR) type = T_PTR;
+        if (_type->type == T_ARR) type = T_ARR;
     }
 };
 
