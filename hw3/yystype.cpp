@@ -264,7 +264,8 @@ void Visitor::visit(ScalarDecl &decl) {
 
 void Visitor::visit(ArrayDecl &decl) {
     // push into symbol table
-    symbol_table.push(decl.token, scope.get_scope(), decl.array_size, M_LOCAL, decl.get_data_type());
+    // Note: Spec doesn't support multi-level-pointer, so array is always `int arr[X]`
+    symbol_table.push(decl.token, scope.get_scope(), decl.array_size, M_LOCAL, T_PTR); 
     Symbol *sym = symbol_table.lookup(decl.token);
     assert(sym != nullptr && "symbol not found");
 
@@ -303,7 +304,7 @@ void Visitor::visit(IfStatement &if_stmt) {
 
     ASM << "  // IfStatement >>>" << std::endl;
 
-    new_if_label_set();
+    int if_idx = new_if_label_set();
 
     // allocate temp for cond
     int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
@@ -318,18 +319,18 @@ void Visitor::visit(IfStatement &if_stmt) {
     if_stmt.cond->accept(*this);
 
     ASM << "  ld t0, " << cond_offset << "(fp)" << std::endl; // t0 = cond
-    ASM << "  beqz t0, " << label_else() << std::endl;  // !cond then goto else
+    ASM << "  beqz t0, " << label_else(if_idx) << std::endl;  // !cond then goto else
 
     // traverse child (if_body)
     if_stmt.if_body->accept(*this);
-    if (if_stmt.else_body) ASM << "  j " << label_end_if() << std::endl;
+    if (if_stmt.else_body) ASM << "  j " << label_end_if(if_idx) << std::endl;
 
-    ASM << label_else() << ":" << std::endl;
+    ASM << label_else(if_idx) << ":" << std::endl;
 
     // traverse child (else_body)
     if (if_stmt.else_body) if_stmt.else_body->accept(*this);
 
-    ASM << label_end_if() << ":" << std::endl;
+    ASM << label_end_if(if_idx) << ":" << std::endl;
 
     // traverse end
     dec_indent();
@@ -343,10 +344,40 @@ void Visitor::visit(IfStatement &if_stmt) {
 
 void Visitor::visit(DoStatement &do_stmt) {
     AST << indent() << "<Do While Statement>" << std::endl;
+
+    ASM << "  // DoStatement >>>" << std::endl;
+
+    int loop_idx = new_loop_label_set();
+    enter_loop(loop_idx);
+
+    // allocate temp for cond
+    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    do_stmt.cond->set_save_to_mem(cond_offset);
+    do_stmt.cond->set_gen_rvalue();
+    ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
+
+    // traverse child
     inc_indent();
+
+    ASM << label_loop_start(loop_idx) << ":" << std::endl;
     do_stmt.body->accept(*this);
+
+    ASM << label_loop_continue(loop_idx) << ":" << std::endl;
     do_stmt.cond->accept(*this);
+    
+    ASM << "  ld t0, " << cond_offset << "(fp)" << std::endl;
+    ASM << "  bnez t0, " << label_loop_start(loop_idx) << std::endl;
+
     dec_indent();
+
+    leave_loop();
+    ASM << label_loop_end(loop_idx) << ":" << std::endl;
+
+    // release temp
+    symbol_table.pop_stack(1);
+    ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
+
+    ASM << "  // <<< DoStatement" << std::endl;
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {
@@ -397,7 +428,7 @@ void Visitor::visit(UnaryExpression &expr) {
     case op_neg: ASM << "  sub t0, x0, t0" << std::endl; break;
     default: 
         std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
-        assert(false && "unsupported unary operator codegen");
+        assert(false && "unsupported unary operator (codegen)");
     }
 
     // Note that op_addr, op_neg must return rvalue
@@ -411,6 +442,16 @@ void Visitor::visit(UnaryExpression &expr) {
         ASM << "  addi " << expr.dest.reg_name << ", t0, 0" << std::endl;
     } else if (expr.dest.is_mem()) {
         ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
+    }
+
+    // return type
+    switch (expr.op) {
+    case op_addr: expr.return_type = T_PTR; break;
+    case op_deref: expr.return_type = T_INT; break;  // Since only single-level-pointer is suported
+    case op_neg: expr.return_type = T_INT; break;
+    default: 
+        std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
+        assert(false && "unsupported unary operator (return type unknown)");
     }
 
     // release temp
@@ -481,7 +522,7 @@ void Visitor::visit(BinaryExpression &expr) {
             break;
         default: 
             std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
-            assert(false && "unsupported binary operator codegen");
+            assert(false && "unsupported binary operator (codegen)");
         }
 
         // Note: arithmetic operator should always be rvalue
@@ -493,6 +534,25 @@ void Visitor::visit(BinaryExpression &expr) {
     } else if (expr.dest.is_mem()) {
         ASM << "  sd t0, " << expr.dest.mem_offset << "(fp)" << std::endl;
     }
+
+    // return type
+    switch (expr.op) {
+    case op_add: case op_sub:
+        expr.return_type = (expr.lhs->return_type == T_PTR || expr.rhs->return_type == T_PTR? T_PTR : T_INT);
+        break;
+    case op_mul: case op_div: case op_lt: case op_eq:
+        expr.return_type = T_INT;
+        break;
+    case op_assign:
+        expr.return_type = expr.lhs->return_type;
+        break;
+    default:
+        std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 
+        assert(false && "unsupported binary operator (return type unknown)");
+    }
+
+    AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]";
+    AST << std::endl;
 
     // release temp
     symbol_table.pop_stack(2);
@@ -506,7 +566,11 @@ std::vector<std::string> caller_preserved_registers {
     "ra", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7" };
 
 void Visitor::visit(CallExpression &expr) {
+    // Note: function always returns int in test case
+    // forget about function returning pointer
+    expr.return_type = T_INT;
     AST << indent() << "<Call Expression>" << std::endl;
+    AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]" << std::endl;
 
     ASM << "  // CallExpression >>>" << std::endl;
 
@@ -533,7 +597,11 @@ void Visitor::visit(CallExpression &expr) {
 }
 
 void Visitor::visit(ArraySubscriptExpression &expr) {
+    // Note that there is no pointer array in test case, forget about it
+    expr.return_type = T_INT; 
+
     AST << indent() << "<Array Subscript Expression>" << std::endl;
+    AST << indent() << "--> [return type = " << get_type_name(expr.return_type) << "]" << std::endl;
 
     ASM << "  // ArraySubscriptExpression >>>" << std::endl;
 
@@ -579,12 +647,14 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
 }
 
 void Visitor::visit(Identifier &id) {
+    Symbol *sym = symbol_table.lookup(id.token);
+    if (sym == nullptr) return;  // probably it is id of function
+    id.return_type = sym->type;
+
     AST << indent() << "<Identifier>";
     AST << "[identifier = " << id.token << "]";
     AST << std::endl;
-
-    Symbol *sym = symbol_table.lookup(id.token);
-    if (sym == nullptr) return;  // probably it is id of function
+    AST << indent() << "--> [return type = " << get_type_name(id.return_type) << "]" << std::endl;
 
     int offset = sym->offset;
 
@@ -609,9 +679,12 @@ void Visitor::visit(Identifier &id) {
 }
 
 void Visitor::visit(Literal &lit) {
+    lit.return_type = T_INT;
+
     AST << indent() << "<Literal>";
     AST << "[value = " << lit.token << "]";
     AST << std::endl;
+    AST << indent() << "--> [return type = " << get_type_name(lit.return_type) << "]" << std::endl;
 
     ASM << "  // Literal >>>" << std::endl;
 

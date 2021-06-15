@@ -33,7 +33,7 @@ codegen: yystype.o y.tab.c lex.yy.cpp
 
 basic_test: codegen
 	@echo "=================="
-	@echo "0.c"
+	@echo "Basic/0.c"
 	@echo "=================="
 	./codegen <Testcase/Basic/0.c
 	${RISCV_CXX} -o codegen.o -c codegen.S
@@ -43,7 +43,7 @@ basic_test: codegen
 
 arithmetic_test: codegen
 	@echo "=================="
-	@echo "0.c"
+	@echo "ArithmeticExpression/0.c"
 	@echo "=================="
 	./codegen <Testcase/ArithmeticExpression/0.c
 	${RISCV_CXX} -o codegen.o -c codegen.S
@@ -51,7 +51,7 @@ arithmetic_test: codegen
 	${SPIKE_PK} ./$@ | tee out
 	diff out Testcase/ArithmeticExpression/0.ans
 	@echo "=================="
-	@echo "1.c"
+	@echo "ArithmeticExpression/1.c"
 	@echo "=================="
 	./codegen <Testcase/ArithmeticExpression/1.c
 	${RISCV_CXX} -o codegen.o -c codegen.S
@@ -61,7 +61,7 @@ arithmetic_test: codegen
 
 pointer_test: codegen
 	@echo "=================="
-	@echo "0.c"
+	@echo "Pointer/0.c"
 	@echo "=================="
 	./codegen <Testcase/Pointer/0.c
 	${RISCV_CXX} -o codegen.o -c codegen.S
@@ -69,13 +69,31 @@ pointer_test: codegen
 	${SPIKE_PK} ./$@ | tee out
 	diff out Testcase/Pointer/0.ans
 	@echo "=================="
-	@echo "1.c"
+	@echo "Pointer/1.c"
 	@echo "=================="
 	./codegen <Testcase/Pointer/1.c
 	${RISCV_CXX} -o codegen.o -c codegen.S
 	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
 	${SPIKE_PK} ./$@ | tee out
 	diff out Testcase/Pointer/1.ans
+
+jump_test: codegen
+	# @echo "=================="
+	# @echo "Jump/0.c"
+	# @echo "=================="
+	# ./codegen <Testcase/Jump/0.c
+	# ${RISCV_CXX} -o codegen.o -c codegen.S
+	# ${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	# ${SPIKE_PK} ./$@ | tee out
+	# diff out Testcase/Jump/0.ans
+	@echo "=================="
+	@echo "Jump/1.c"
+	@echo "=================="
+	./codegen <Testcase/Jump/1.c
+	${RISCV_CXX} -o codegen.o -c codegen.S
+	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	${SPIKE_PK} ./$@ | tee out
+	diff out Testcase/Jump/1.ans
 
 test:
 	${RISCV_CXX} -o codegen.o -c codegen.S

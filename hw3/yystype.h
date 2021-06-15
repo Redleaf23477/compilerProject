@@ -154,13 +154,34 @@ struct Visitor {
     void restore_regs_from_stack(std::string whom, std::vector<std::string> &regs);
 
     // codegen label maintainer
+    std::string gen_label(std::string str, int idx) { char buff[30]; sprintf(buff, "_%d", idx); return str+buff; }
+
     int if_cnt;
-    void new_if_label_set() { ++if_cnt; }
-    std::string label_else() { char buff[30]; sprintf(buff, "else_%d", if_cnt); return std::string(buff); }
-    std::string label_end_if() { char buff[30]; sprintf(buff, "endif_%d", if_cnt); return std::string(buff); }
+    int new_if_label_set() { return ++if_cnt; }
+    std::string label_else(int idx) { return gen_label("else", idx); }
+    std::string label_end_if(int idx) { return gen_label("endif", idx); }
+
+    int loop_cnt;
+    int new_loop_label_set() { return ++loop_cnt; }
+    /* loop_start: label where loop starts */
+    std::string label_loop_start(int idx) { return gen_label("lstart", idx); }
+    /* loop_continue: label where `continue` goes to */
+    std::string label_loop_continue(int idx) { return gen_label("lcont", idx); }
+    /* loop_cond: label where condition starts*/
+    std::string label_loop_cond(int idx) { return gen_label("lcond", idx); }
+    /* loop_end: label where `break` goes to */
+    std::string label_loop_end(int idx) { return gen_label("lend", idx); }
+
+    // maintain which label should `break` `continue` jump to
+    // Note: will break when function is allowed to return in the middle of func body
+    std::vector<int> loop_stack;
+    void enter_loop(int idx) { loop_stack.emplace_back(idx); }
+    void leave_loop() { loop_stack.pop_back(); }
+    int get_current_loop() { return loop_stack.empty()? -1 : loop_stack.back(); }
+
 
     // constructor & visitor pattern
-    Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0), if_cnt(0) {}
+    Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0), if_cnt(0), loop_cnt(0) {}
 
     void visit(Node &);
     void visit(TranslationUnit &);
@@ -329,7 +350,7 @@ struct CompoundStatement : public Statement {
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
     CompoundStatement(NodeList<Node*> *_list) {
-        std::swap(_list->arr, stmt_decl_list);
+        if (_list) std::swap(_list->arr, stmt_decl_list);
     }
     ~CompoundStatement();
 };
@@ -372,6 +393,9 @@ struct ExpressionStatement : public Statement {
 
 struct Expression : public Node {
     CodegenDest dest;
+    DataType return_type;
+
+    Expression():return_type(T_INT) {}
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
     virtual ~Expression() {}

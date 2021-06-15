@@ -352,7 +352,7 @@ return_statement
     ;
 
 compound_statement
-    : '{' '}'                               { $$ = new CompoundStatement(new NodeList<Node*>); cleanup($1, $2); }
+    : '{' '}'                               { $$ = new CompoundStatement(nullptr); cleanup($1, $2); }
     | '{' statement_declaration_list '}'    { $$ = new CompoundStatement($2); cleanup($1, $2, $3); }
     ;
 
