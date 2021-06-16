@@ -39,6 +39,7 @@ enum Operator {
     // Relational
     op_lt,
     op_eq,
+    op_neq,
     // Assignment
     op_assign,
     // Pointer & Address
@@ -66,6 +67,7 @@ struct CompoundStatement;
 struct ExpressionStatement;
 struct IfStatement;
 struct DoStatement;  // do-while
+struct WhileStatement; 
 struct ForStatement;
 struct Expression;
 struct UnaryExpression;
@@ -206,6 +208,7 @@ struct Visitor {
     void visit(ExpressionStatement &);
     void visit(IfStatement &);
     void visit(DoStatement &);
+    void visit(WhileStatement &);
     void visit(ForStatement &);
     void visit(Expression &);
     void visit(UnaryExpression &);
@@ -410,6 +413,17 @@ struct DoStatement : public Statement {
     void accept(Visitor &visitor) { visitor.visit(*this); }
     DoStatement(Expression *_cond, Statement *_body) : cond(_cond), body(_body) {}
     ~DoStatement();
+};
+
+// While Statement
+
+struct WhileStatement : public Statement {
+    Expression *cond;
+    Statement *body;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+    WhileStatement(Expression *_cond, Statement *_body) : cond(_cond), body(_body) {}
+    ~WhileStatement();
 };
 
 // For Statement

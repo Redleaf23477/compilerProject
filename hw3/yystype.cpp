@@ -31,6 +31,7 @@ std::string get_op_name(Operator op) {
     case op_div: return "div";
     case op_lt: return "less than";
     case op_eq: return "equal to";
+    case op_neq: return "not equal to";
     case op_assign: return "assign";
     case op_addr: return "address of";
     case op_deref: return "de-reference";
@@ -140,6 +141,11 @@ IfStatement::~IfStatement() {
 }
 
 DoStatement::~DoStatement() {
+    delete cond;
+    delete body;
+}
+
+WhileStatement::~WhileStatement() {
     delete cond;
     delete body;
 }
@@ -407,6 +413,46 @@ void Visitor::visit(DoStatement &do_stmt) {
     ASM << "  // <<< DoStatement" << std::endl;
 }
 
+void Visitor::visit(WhileStatement &while_stmt) {
+    AST << indent() << "<While Statement>";
+    AST << "[scope = " << scope.get_scope() << "]";
+    AST << std::endl;
+
+    ASM << "  // WhileStatement >>>" << std::endl;
+
+    int loop_idx = new_loop_label_set();
+    enter_loop(loop_idx);
+
+    // allocate temp for cond
+    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    while_stmt.cond->set_save_to_mem(cond_offset);
+    while_stmt.cond->set_gen_rvalue();
+    ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
+
+    // fall-through implementation
+
+    inc_indent();
+
+    ASM << label_loop_continue(loop_idx) << ":" << std::endl;
+    while_stmt.cond->accept(*this);
+    ASM << "  ld t0, " << -cond_offset << "(fp)" << std::endl;
+    ASM << "  beqz t0, " << label_loop_end(loop_idx) << std::endl;
+
+    while_stmt.body->accept(*this);
+    ASM << "  j " << label_loop_continue(loop_idx) << std::endl;
+    
+    dec_indent();
+
+    leave_loop();
+    ASM << label_loop_end(loop_idx) << ":" << std::endl;
+
+    // release temp
+    symbol_table.pop_stack(1);
+    ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
+
+    ASM << "  // <<< WhileStatement" << std::endl;
+}
+
 void Visitor::visit(ForStatement &for_stmt) {
     AST << indent() << "<For Statement>";
     AST << "[scope = " << scope.get_scope() << "]";
@@ -574,7 +620,7 @@ void Visitor::visit(BinaryExpression &expr) {
     case op_add: case op_sub:
         expr.return_type = (expr.lhs->return_type == T_PTR || expr.rhs->return_type == T_PTR? T_PTR : T_INT);
         break;
-    case op_mul: case op_div: case op_lt: case op_eq:
+    case op_mul: case op_div: case op_lt: case op_eq: case op_neq:
         expr.return_type = T_INT;
         break;
     case op_assign:
@@ -608,6 +654,10 @@ void Visitor::visit(BinaryExpression &expr) {
         case op_eq: 
             ASM << "  sub t0, t0, t1" << std::endl;
             ASM << "  seqz t0, t0" << std::endl;
+            break;
+        case op_neq:
+            ASM << "  sub t0, t0, t1" << std::endl;
+            ASM << "  snez t0, t0" << std::endl;
             break;
         default: 
             std::cerr << "unsupported operator " << get_op_name(expr.op) << std::endl; 

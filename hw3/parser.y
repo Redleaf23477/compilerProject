@@ -181,7 +181,7 @@ void codegen(Declaration*);
 %type<node> switch_clause
 %type<node> statement_list
 %type<stmt> iteration_statement
-%type<node> while_statement
+%type<stmt> while_statement
 %type<stmt> do_while_statement
 %type<stmt> for_statement
 //%type<node> emptiable_expression
@@ -316,7 +316,7 @@ iteration_statement
     ;
 
 while_statement
-    : WHILE '(' expression ')' statement    { set($$, STMT, $1, $2, $3, $4, $5); }
+    : WHILE '(' expression ')' statement    { $$ = new WhileStatement($3, $5); cleanup($1, $2, $4); }
     ;
 
 do_while_statement
@@ -474,7 +474,7 @@ relational_expression
 equality_expression
     : relational_expression
     | equality_expression EQ_OP relational_expression   { $$ = new BinaryExpression(op_eq, $1, $3); cleanup($2); }
-    | equality_expression NEQ_OP relational_expression  //{ set($$, EXPR, $1, $2, $3); }
+    | equality_expression NEQ_OP relational_expression  { $$ = new BinaryExpression(op_neq, $1, $3); cleanup($2); }
     ;
 
 bitwise_and_expression
