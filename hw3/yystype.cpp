@@ -709,14 +709,25 @@ void Visitor::visit(CallExpression &expr) {
 
     ASM << "  // CallExpression >>>" << std::endl;
 
+    // allocate temp
+    int args_n = expr.argument_list.size();
+    int args_offset = symbol_table.push_stack(args_n) * WORD_SIZE;
+    ASM << "  addi sp, sp, " << -args_n*WORD_SIZE << std::endl;
+
     inc_indent();
-    for (size_t i = 0; i < expr.argument_list.size(); i++) {
+    for (int i = 0; i < args_n; i++) {
         auto &arg = expr.argument_list[i];
-        arg->set_save_to_reg(arg_regs[i]); 
+        arg->set_save_to_mem(args_offset + i * WORD_SIZE); 
         arg->set_gen_rvalue(); 
         arg->accept(*this);
     }
     expr.expr->accept(*this);
+
+    // load arguments from stack to reg
+    // note that args_n is always <= 7 in test case, forget about case where there are many args
+    for (int i = 0; i < args_n; i++) {
+        ASM << "  ld " << arg_regs[i] << ", " << -(args_offset + i * WORD_SIZE) << "(fp)" << std::endl;
+    }
 
     // store caller preserved registers
     save_regs_on_stack("caller", caller_preserved_registers);
@@ -725,6 +736,17 @@ void Visitor::visit(CallExpression &expr) {
 
     // restore caller preserved registers
     restore_regs_from_stack("caller", caller_preserved_registers);
+
+    // return value, originally stored in a0
+    if (expr.dest.is_reg()) {
+        ASM << "  addi " << expr.dest.reg_name << ", a0, 0" << std::endl;
+    } else if (expr.dest.is_mem()) {
+        ASM << "  sd a0, " << -expr.dest.mem_offset << "(fp)" << std::endl;
+    }
+
+    // release temp
+    symbol_table.pop_stack(args_n);
+    ASM << "  addi sp, sp, " << args_n*WORD_SIZE << std::endl;
 
     ASM << "  // <<< CallExpression" << std::endl;
 
