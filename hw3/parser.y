@@ -98,6 +98,7 @@ void codegen(Declaration*);
     Type* type;
     TranslationUnit* translation_unit;
     Declaration* decl;
+    FuncDecl* func_decl;
     FuncDefn* func_defn;
     Statement* stmt;
     ExpressionStatement* expr_stmt;
@@ -219,8 +220,10 @@ void codegen(Declaration*);
 %type<decl> init_declarator
 %type<decl> declarator
 %type<decl> direct_declarator
-%type<node> parameter_list
-%type<node> parameter_declaration
+%type<func_decl> function_declarator
+%type<func_decl> direct_function_declarator
+%type<decl_list> parameter_list
+%type<decl> parameter_declaration
 %type<type> pointer
 %type<expr> initializer
 %type<node> initializer_list
@@ -253,7 +256,7 @@ external_declaration
  **********************************/
 
 function_definition
-    : declaration_specifiers declarator compound_statement { $$ = new FuncDefn($1, $2->token, $3); }
+    : declaration_specifiers function_declarator compound_statement { $$ = new FuncDefn($1, $2, $3); }
     ;
 
 /**********************************
@@ -570,6 +573,7 @@ init_declarator_list
 init_declarator
     : declarator
     | declarator '=' initializer   { $$ = $1; $$->set_initializer($3); cleanup($2); }
+    | function_declarator
     ;
 
 // declare without/with pointer
@@ -580,24 +584,32 @@ declarator
     | pointer direct_declarator { $$ = $2; $$->set_type($1); }
     ;
 
+function_declarator
+    : direct_function_declarator
+    | pointer direct_function_declarator { $$ = $2; $$->set_type($1); }
+    ;
+
 // declare the name of variable
 direct_declarator
     : IDENTIFIER                            { $$ = new ScalarDecl($1->token); cleanup($1); }
-    | IDENTIFIER '(' ')'                    { $$ = new FuncDecl($1->token); cleanup($1, $2, $3); }
-    | IDENTIFIER '(' parameter_list ')'     //{ set($$, NOTAG, $1, $2, $3, $4), set_hint($$, FDEC); }
       /* supports simple 1D array declation only, e.g. arr[3] */
     | direct_declarator '[' expression ']'  { $$ = new ArrayDecl($1->token, atoi($3->token)); cleanup($1, $2, $3, $4); }
     ;
 
+direct_function_declarator
+    : IDENTIFIER '(' ')'                    { $$ = new FuncDecl($1->token); cleanup($1, $2, $3); }
+    | IDENTIFIER '(' parameter_list ')'     { $$ = new FuncDecl($1->token, $3); cleanup($1, $2, $3, $4); }
+    ;
+
 // grammar of parameter list
 parameter_list
-    : parameter_declaration
-    | parameter_declaration ',' parameter_list  { set($$, NOTAG, $1, $2, $3); }
+    : parameter_declaration                     { $$ = new NodeList<Declaration*>; $$->push($1); }
+    | parameter_declaration ',' parameter_list  { $$ = $3; $$->push($1); cleanup($2); }
     ;
 
 parameter_declaration
       /* TYPE id */
-    : declaration_specifiers declarator { set($$, NOTAG, $1, $2); }
+    : declaration_specifiers declarator { $$ = $2; $$->set_type($1);  }
     ;
 
 // terminal: pointer (only supports single level pointer)

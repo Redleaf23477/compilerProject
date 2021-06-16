@@ -127,6 +127,7 @@ MultiDecl::~MultiDecl() {
 }
 
 FuncDefn::~FuncDefn() {
+    delete func_decl;
     delete func_body;
 }
 
@@ -215,7 +216,7 @@ void Visitor::visit(FuncDecl &decl) {
     AST << indent() << "<Function Declaration>";
     AST << "[return: " << get_type_name(decl.get_data_type()) << "]";
     AST << "[function name: " << decl.token << "]";
-    AST << "[parameters: ]";
+    AST << "[parameters: " << decl.parameter_list.size() << "]";
     AST << std::endl;
 }
 
@@ -224,14 +225,14 @@ std::vector<std::string> callee_preserved_registers {
 
 void Visitor::visit(FuncDefn &defn) {
     AST << indent() << "<Function Definition>";
-    AST << "[return: " << get_type_name(defn.get_data_type()) << "]";
-    AST << "[function name: " << defn.token << "]";
-    AST << "[parameters: ]";
+    AST << "[return: " << get_type_name(defn.func_decl->get_data_type()) << "]";
+    AST << "[function name: " << defn.func_decl->token << "]";
+    AST << "[parameters: " << defn.func_decl->parameter_list.size() << "]";
     AST << std::endl;
 
     // function header in asm
-    ASM << ".global " << defn.token << std::endl;
-    ASM << defn.token << ":" << std::endl;
+    ASM << ".global " << defn.func_decl->token << std::endl;
+    ASM << defn.func_decl->token << ":" << std::endl;
 
     // store callee preserved registers
     save_regs_on_stack("callee", callee_preserved_registers);
@@ -239,6 +240,13 @@ void Visitor::visit(FuncDefn &defn) {
     // set new frame
     ASM << "  addi s0, sp, 104" << std::endl;
 
+    // save parameters as local variables
+    int arg_n = defn.func_decl->parameter_list.size();
+    for (int i = 0; i < arg_n; i++) {
+        Declaration *decl = defn.func_decl->parameter_list[i];
+        symbol_table.push(decl->token, scope.get_scope(), 1, M_LOCAL, decl->get_data_type());
+    }
+    ASM << "  addi sp, sp, " << -arg_n*WORD_SIZE << std::endl;
 
     inc_indent();
     defn.func_body->accept(*this);

@@ -95,6 +95,24 @@ jump_test: codegen
 	${SPIKE_PK} ./$@ | tee out
 	diff out Testcase/Jump/1.ans
 
+function_test: codegen
+	@echo "=================="
+	@echo "Function/0.c"
+	@echo "=================="
+	./codegen <Testcase/Function/0.c
+	${RISCV_CXX} -o codegen.o -c codegen.S
+	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	${SPIKE_PK} ./$@ | tee out
+	diff out Testcase/Function/0.ans
+	@echo "=================="
+	@echo "Function/1.c"
+	@echo "=================="
+	./codegen <Testcase/Function/1.c
+	${RISCV_CXX} -o codegen.o -c codegen.S
+	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o
+	${SPIKE_PK} ./$@ | tee out
+	diff out Testcase/Function/1.ans
+
 test:
 	${RISCV_CXX} -o codegen.o -c codegen.S
 	${RISCV_CXX} -o $@ ${ARDUINO_MAIN} codegen.o

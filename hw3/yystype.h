@@ -324,17 +324,20 @@ struct FuncDecl : public Declaration {
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    FuncDecl(char* str):Declaration(str) {}
+    FuncDecl(char* str, NodeList<Declaration*> *_list = nullptr):Declaration(str) {
+        if (_list) std::swap(_list->arr, parameter_list);
+    }
     virtual ~FuncDecl();
 };
 
-struct FuncDefn : public FuncDecl {
+struct FuncDefn : public Declaration {
+    FuncDecl *func_decl;
     Statement *func_body;
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    FuncDefn(Type* _type, char *str, Statement *body):FuncDecl(str), func_body(body) { 
-        set_type(_type); 
+    FuncDefn(Type* _type, FuncDecl *decl, Statement *body):func_decl(decl), func_body(body) { 
+        func_decl->set_type(_type); 
     }
     ~FuncDefn();
 };
