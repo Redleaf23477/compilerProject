@@ -6,6 +6,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <tuple>
 
 // #define YYSTYPE Node*
 
@@ -187,10 +188,11 @@ struct Visitor {
 
     // maintain which label should `break` `continue` jump to
     // Note: will break when function is allowed to return in the middle of func body
-    std::vector<int> loop_stack;
-    void enter_loop(int idx) { loop_stack.emplace_back(idx); }
+    // (loop idx, loop scope)
+    std::vector<std::tuple<int,int>> loop_stack;
+    void enter_loop(int idx, int scope) { loop_stack.emplace_back(idx, scope); }
     void leave_loop() { loop_stack.pop_back(); }
-    int get_current_loop() { return loop_stack.empty()? -1 : loop_stack.back(); }
+    std::tuple<int,int> get_current_loop() { return loop_stack.empty()? std::make_tuple(-1, -1) : loop_stack.back(); }
 
 
     // constructor & visitor pattern

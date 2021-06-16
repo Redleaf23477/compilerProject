@@ -389,7 +389,7 @@ void Visitor::visit(DoStatement &do_stmt) {
     ASM << "  // DoStatement >>>" << std::endl;
 
     int loop_idx = new_loop_label_set();
-    enter_loop(loop_idx);
+    enter_loop(loop_idx, scope.get_scope());
 
     // allocate temp for cond
     int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
@@ -429,7 +429,7 @@ void Visitor::visit(WhileStatement &while_stmt) {
     ASM << "  // WhileStatement >>>" << std::endl;
 
     int loop_idx = new_loop_label_set();
-    enter_loop(loop_idx);
+    enter_loop(loop_idx, scope.get_scope());
 
     // allocate temp for cond
     int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
@@ -469,7 +469,7 @@ void Visitor::visit(ForStatement &for_stmt) {
     ASM << "  // ForStatement >>>" << std::endl;
 
     int loop_idx = new_loop_label_set();
-    enter_loop(loop_idx);
+    enter_loop(loop_idx, scope.get_scope());
 
     // allocate temp for cond
     int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
@@ -520,6 +520,12 @@ void Visitor::visit(ExpressionStatement &expr_stmt) {
 
 void Visitor::visit(BreakStatement &break_stmt) {
     AST << indent() << "<BreakStatement>" << std::endl;
+
+    auto [loop_idx, loop_scope] = loop_stack.back();
+    int released_cnt = symbol_table.clear_to_scope(loop_scope);
+    ASM << "  addi sp, sp, " << released_cnt * WORD_SIZE << std::endl;
+
+    ASM << "  j " << label_loop_end(loop_idx) << std::endl;
 }
 
 void Visitor::visit(Expression &expr) {
