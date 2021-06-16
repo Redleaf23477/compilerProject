@@ -604,7 +604,7 @@ direct_function_declarator
 // grammar of parameter list
 parameter_list
     : parameter_declaration                     { $$ = new NodeList<Declaration*>; $$->push($1); }
-    | parameter_declaration ',' parameter_list  { $$ = $3; $$->push($1); cleanup($2); }
+    | parameter_list ',' parameter_declaration  { $$ = $1; $$->push($3); cleanup($2); }
     ;
 
 parameter_declaration
