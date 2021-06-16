@@ -412,12 +412,46 @@ void Visitor::visit(ForStatement &for_stmt) {
     AST << "[scope = " << scope.get_scope() << "]";
     AST << std::endl;
 
+    ASM << "  // ForStatement >>>" << std::endl;
+
+    int loop_idx = new_loop_label_set();
+    enter_loop(loop_idx);
+
+    // allocate temp for cond
+    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    for_stmt.condition->set_save_to_mem(cond_offset);
+    for_stmt.condition->set_gen_rvalue();
+    ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
+
+    // fall-through implementation
+
     // traverse child
     inc_indent();
+
     for_stmt.initialize->accept(*this);
+
+    ASM << label_loop_cond(loop_idx) << ":" << std::endl;
     for_stmt.condition->accept(*this);
+    ASM << "  ld t0, " << -cond_offset << "(fp)" << std::endl;
+    ASM << "  beqz t0, " << label_loop_end(loop_idx) << std::endl;
+
+    for_stmt.body->accept(*this);
+
+    ASM << label_loop_continue(loop_idx) << ":" << std::endl;
     for_stmt.increment->accept(*this);
+    ASM << "  j " << label_loop_cond(loop_idx) << std::endl;
+
     dec_indent();
+
+    leave_loop();
+
+    ASM << label_loop_end(loop_idx) << ":" << std::endl;
+
+    // release temp
+    symbol_table.pop_stack(1);
+    ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
+
+    ASM << "  // ForStatement >>>" << std::endl;
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {
