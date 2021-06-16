@@ -195,9 +195,12 @@ struct Visitor {
     void leave_loop() { loop_stack.pop_back(); }
     std::tuple<int,int> get_current_loop() { return loop_stack.empty()? std::make_tuple(-1, -1) : loop_stack.back(); }
 
+    // currently in which function, used for return stmt
+    FuncDefn *current_function;
+    std::string label_function_end();  
 
     // constructor & visitor pattern
-    Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0), if_cnt(0), loop_cnt(0) {}
+    Visitor():AST("ast.txt"), ASM("codegen.S"), ast_indent(0), if_cnt(0), loop_cnt(0), current_function(nullptr) {}
 
     void visit(Node &);
     void visit(TranslationUnit &);

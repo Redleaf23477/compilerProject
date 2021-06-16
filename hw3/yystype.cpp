@@ -4,6 +4,13 @@
 #include <cassert>
 #include "yystype.h"
 
+// riscv registers
+std::vector<std::string> arg_regs { "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7" };
+std::vector<std::string> caller_preserved_registers { 
+    "ra", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7" };
+std::vector<std::string> callee_preserved_registers {
+    "sp", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11" };
+
 // utils
 
 std::string tag2str(Tag t) {
@@ -83,6 +90,12 @@ void Visitor::restore_regs_from_stack(std::string whom, std::vector<std::string>
     }
     ASM << "  addi sp, sp, " << WORD_SIZE * (int)regs.size() << std::endl;
     ASM << "  // <<<" << std::endl;
+}
+
+std::string Visitor::label_function_end() {
+    std::string label = current_function->func_decl->token;
+    label += "_end";
+    return label;
 }
 
 // Node Class
@@ -224,15 +237,14 @@ void Visitor::visit(FuncDecl &decl) {
     AST << std::endl;
 }
 
-std::vector<std::string> callee_preserved_registers {
-    "sp", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11" };
-
 void Visitor::visit(FuncDefn &defn) {
     AST << indent() << "<Function Definition>";
     AST << "[return: " << get_type_name(defn.func_decl->get_data_type()) << "]";
     AST << "[function name: " << defn.func_decl->token << "]";
     AST << "[parameters: " << defn.func_decl->parameter_list.size() << "]";
     AST << std::endl;
+
+    current_function = &defn;
 
     // function header in asm
     ASM << ".global " << defn.func_decl->token << std::endl;
@@ -249,6 +261,8 @@ void Visitor::visit(FuncDefn &defn) {
     for (int i = 0; i < arg_n; i++) {
         Declaration *decl = defn.func_decl->parameter_list[i];
         symbol_table.push(decl->token, scope.get_scope(), 1, M_LOCAL, decl->get_data_type());
+        Symbol *sym = symbol_table.lookup(decl->token);
+        ASM << "  sd " << arg_regs[i] << ", " << -sym->offset << "(fp)" << std::endl;
     }
     ASM << "  addi sp, sp, " << -arg_n*WORD_SIZE << std::endl;
 
@@ -259,8 +273,12 @@ void Visitor::visit(FuncDefn &defn) {
     // restore callee preserved registers
     ASM << "  // release local variables" << std::endl;
     ASM << "  addi sp, sp, " << WORD_SIZE * (symbol_table.frame_cnt - callee_preserved_registers.size()) << std::endl;
+
+    ASM << label_function_end() << ":" << std::endl;
     restore_regs_from_stack("callee", callee_preserved_registers);
     symbol_table.pop_stack(callee_preserved_registers.size());
+
+    current_function = nullptr;
 
     // return
     ASM << "  jalr x0, 0(ra)" << std::endl;
@@ -534,10 +552,30 @@ void Visitor::visit(BreakStatement &break_stmt) {
 
 void Visitor::visit(ReturnStatement &return_stmt) {
     AST << indent() << "<ReturnStatement>" << std::endl;
+
+    ASM << "  // ReturnStatement >>>" << std::endl;
+
+    // allocate temp
+    int tmp_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    return_stmt.expr->set_save_to_mem(tmp_offset);
+    return_stmt.expr->set_gen_rvalue();
+    ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
     
     inc_indent();
     if (return_stmt.expr) return_stmt.expr->accept(*this);
     dec_indent();
+
+    ASM << "  ld a0, " << -tmp_offset << "(fp)" << std::endl;
+
+    // release temp
+    symbol_table.pop_stack(1);
+    ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
+
+    ASM << "  // release local variables" << std::endl;
+    ASM << "  addi sp, sp, " << WORD_SIZE * (symbol_table.frame_cnt - callee_preserved_registers.size()) << std::endl;
+
+    ASM << "  j " << label_function_end() << std::endl;
+    ASM << "  // <<< ReturnStatement" << std::endl;
 }
 
 void Visitor::visit(Expression &expr) {
@@ -727,10 +765,6 @@ void Visitor::visit(BinaryExpression &expr) {
     ASM << "  // <<< BinaryExpression" << std::endl;
 }
 
-std::vector<std::string> arg_regs { "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7" };
-std::vector<std::string> caller_preserved_registers { 
-    "ra", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7" };
-
 void Visitor::visit(CallExpression &expr) {
     // Note: function always returns int in test case
     // forget about function returning pointer
@@ -764,15 +798,15 @@ void Visitor::visit(CallExpression &expr) {
 
     ASM << "  jal ra, " << expr.expr->token << std::endl;
 
-    // restore caller preserved registers
-    restore_regs_from_stack("caller", caller_preserved_registers);
-
     // return value, originally stored in a0
     if (expr.dest.is_reg()) {
         ASM << "  addi " << expr.dest.reg_name << ", a0, 0" << std::endl;
     } else if (expr.dest.is_mem()) {
         ASM << "  sd a0, " << -expr.dest.mem_offset << "(fp)" << std::endl;
     }
+
+    // restore caller preserved registers
+    restore_regs_from_stack("caller", caller_preserved_registers);
 
     // release temp
     symbol_table.pop_stack(args_n);
