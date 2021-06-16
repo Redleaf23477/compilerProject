@@ -183,8 +183,8 @@ void codegen(Declaration*);
 %type<stmt> iteration_statement
 %type<node> while_statement
 %type<stmt> do_while_statement
-%type<node> for_statement
-%type<node> emptiable_expression
+%type<stmt> for_statement
+//%type<node> emptiable_expression
 %type<node> jump_statement
 %type<node> break_statement
 %type<node> continue_statement
@@ -324,14 +324,16 @@ do_while_statement
     ;
 
 for_statement
-    : FOR '(' emptiable_expression ';' emptiable_expression ';' emptiable_expression ')' statement {
-            set($$, STMT, $1, $2, $3, $4, $5, $6, $7, $8, $9); }
+    : FOR '(' expression ';' expression ';' expression ')' statement {
+        $$ = new ForStatement($3, $5, $7, $9); cleanup($1, $2, $4, $6, $8); }
     ;
 
+/*
 emptiable_expression
-    : /* empty */   { $$ = new Node; }
+    :               { $$ = new Node; } // empty
     | expression
     ;
+*/
 
 jump_statement
     : break_statement
@@ -400,7 +402,7 @@ argument_expression_list
     | argument_expression_list ',' assignment_expression    { $$ = $1; $$->push($3); cleanup($2); }
     ;
 
-    /*
+/*
 unary_operation_expression
     : suffix_expression
     | unary_operator unary_operation_expression { set($$, EXPR, $1, $2); }
@@ -417,7 +419,7 @@ prefix_expression
     | '(' type_name ')' prefix_expression   //{ set($$, EXPR, $1, $2, $3, $4); }
     ;
 
-    /*
+/*
 unary_operator
     : '&'
     | '*'
@@ -426,14 +428,13 @@ unary_operator
     | '+'
     | '-'
     ;
-    */
+*/
 
 type_name
     : specifier_qualifier_list
     | specifier_qualifier_list pointer      { set($$, NOTAG, $1, $2); }
     ;
 
-    // TODO: wait until declaration
 specifier_qualifier_list
     : type_qualifier
     | type_qualifier specifier_qualifier_list   { set($$, NOTAG, $1, $2); }

@@ -144,6 +144,13 @@ DoStatement::~DoStatement() {
     delete body;
 }
 
+ForStatement::~ForStatement() {
+    delete initialize;
+    delete condition;
+    delete increment;
+    delete body;
+}
+
 ExpressionStatement::~ExpressionStatement() {
     delete expr;
 }
@@ -398,6 +405,19 @@ void Visitor::visit(DoStatement &do_stmt) {
     ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
 
     ASM << "  // <<< DoStatement" << std::endl;
+}
+
+void Visitor::visit(ForStatement &for_stmt) {
+    AST << indent() << "<For Statement>";
+    AST << "[scope = " << scope.get_scope() << "]";
+    AST << std::endl;
+
+    // traverse child
+    inc_indent();
+    for_stmt.initialize->accept(*this);
+    for_stmt.condition->accept(*this);
+    for_stmt.increment->accept(*this);
+    dec_indent();
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {
