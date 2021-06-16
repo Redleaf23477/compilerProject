@@ -121,6 +121,10 @@ FuncDecl::~FuncDecl() {
     for (auto x : parameter_list) delete x;
 }
 
+MultiDecl::~MultiDecl() {
+    for (auto x : decl_list) delete x;
+}
+
 FuncDefn::~FuncDefn() {
     delete func_body;
 }
@@ -235,6 +239,12 @@ void Visitor::visit(FuncDefn &defn) {
 
     // return
     ASM << "  jalr x0, 0(ra)" << std::endl;
+}
+
+void Visitor::visit(MultiDecl &decl) {
+    // no codegen :)
+    // no ast :)
+    for (auto x : decl.decl_list) x->accept(*this);
 }
 
 void Visitor::visit(ScalarDecl &decl) {

@@ -57,6 +57,7 @@ struct Type;
 struct Declaration;
 struct FuncDecl;
 struct FuncDefn;
+struct MultiDecl;   // int a, b, c;
 struct ScalarDecl;
 struct ArrayDecl;
 struct TranslationUnit;
@@ -196,6 +197,7 @@ struct Visitor {
     void visit(Declaration &);
     void visit(FuncDecl &);
     void visit(FuncDefn &);
+    void visit(MultiDecl &);
     void visit(ScalarDecl &);
     void visit(ArrayDecl &);
     void visit(Statement &);
@@ -294,12 +296,14 @@ struct Declaration : public Node {
     Type *type; // scalar, atomic element of array, return type of function
     Expression *initializer;
 
+    Declaration():type(nullptr), initializer(nullptr) {}
+
     Declaration(char *txt):Node(txt), type(nullptr), initializer(nullptr) {}
     virtual ~Declaration();
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    void set_type(Type* _type) { 
+    virtual void set_type(Type* _type) { 
         if (type == nullptr) type = _type;
         else { type->add(_type); delete _type; }
     }
@@ -332,11 +336,30 @@ struct FuncDefn : public FuncDecl {
 
 // variable declaration
 
+struct MultiDecl: public Declaration {
+    std::vector<Declaration*> decl_list;
+
+    void set_type(Type *_type) {
+        for (auto decl : decl_list) {
+            Type *t = new Type(*_type);
+            decl->Declaration::set_type(t);
+        }
+        delete _type;
+    }
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+    MultiDecl(NodeList<Declaration*> *_list) {
+        std::swap(_list->arr, decl_list);
+    }
+    ~MultiDecl();
+};
+
 struct ScalarDecl : public Declaration {
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
     ScalarDecl(char* str):Declaration(str) {}
 };
+
 
 struct ArrayDecl : public Declaration {
     int array_size;

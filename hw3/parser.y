@@ -103,6 +103,7 @@ void codegen(Declaration*);
     ExpressionStatement* expr_stmt;
     Expression* expr;
     NodeList<Expression*>* expr_list;
+    NodeList<Declaration*>* decl_list;
     NodeList<Node*>* node_list;
 }
 
@@ -214,7 +215,7 @@ void codegen(Declaration*);
 %type<type> declaration_specifiers
 %type<node> type_specifier
 %type<node> type_qualifier
-%type<decl> init_declarator_list
+%type<decl_list> init_declarator_list
 %type<decl> init_declarator
 %type<decl> declarator
 %type<decl> direct_declarator
@@ -522,7 +523,7 @@ expression
 
 declaration
       /* (Type) (id/id=...) ; */
-    : declaration_specifiers init_declarator_list ';' { $$ = $2; $$->set_type($1); cleanup($3); }
+    : declaration_specifiers init_declarator_list ';' { $$ = new MultiDecl($2); $$->set_type($1); cleanup($2, $3); }
     ;
 
 // grammar describing a type
@@ -559,9 +560,9 @@ type_qualifier
 // grammar describing a set of declaraed name (and possibly initialization)
 init_declarator_list
       /* single declared instance */
-    : init_declarator
+    : init_declarator                           { $$ = new NodeList<Declaration*>; $$->push($1); }
       /* multiple declared instance */
-    | init_declarator ',' init_declarator_list  // { set($$, NOTAG, $1, $2, $3), set_hint($$, $1); }
+    | init_declarator ',' init_declarator_list  { $$ = $3; $$->push($1); cleanup($2); }
     ;
 
 // declare without/with copy initialization
