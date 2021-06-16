@@ -189,7 +189,7 @@ void codegen(Declaration*);
 %type<stmt> jump_statement
 %type<stmt> break_statement
 %type<node> continue_statement
-%type<node> return_statement
+%type<stmt> return_statement
 %type<stmt> compound_statement
 %type<node_list> statement_declaration_list
 %type<expr> primary_expression
@@ -353,8 +353,8 @@ continue_statement
     ;
 
 return_statement
-    : RETURN ';'                { set($$, STMT, $1, $2); }
-    | RETURN expression ';'     { set($$, STMT, $1, $2, $3); }
+    : RETURN ';'                { $$ = new ReturnStatement; cleanup($1, $2); }
+    | RETURN expression ';'     { $$ = new ReturnStatement($2); cleanup($1, $3); }
     ;
 
 compound_statement

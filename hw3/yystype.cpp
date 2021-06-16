@@ -162,6 +162,10 @@ ExpressionStatement::~ExpressionStatement() {
     delete expr;
 }
 
+ReturnStatement::~ReturnStatement() {
+    if (expr) delete expr;
+}
+
 UnaryExpression::~UnaryExpression() {
     delete expr;
 }
@@ -526,6 +530,14 @@ void Visitor::visit(BreakStatement &break_stmt) {
     ASM << "  addi sp, sp, " << released_cnt * WORD_SIZE << std::endl;
 
     ASM << "  j " << label_loop_end(loop_idx) << std::endl;
+}
+
+void Visitor::visit(ReturnStatement &return_stmt) {
+    AST << indent() << "<ReturnStatement>" << std::endl;
+    
+    inc_indent();
+    if (return_stmt.expr) return_stmt.expr->accept(*this);
+    dec_indent();
 }
 
 void Visitor::visit(Expression &expr) {

@@ -71,6 +71,7 @@ struct DoStatement;  // do-while
 struct WhileStatement; 
 struct ForStatement;
 struct BreakStatement;
+struct ReturnStatement;
 struct Expression;
 struct UnaryExpression;
 struct BinaryExpression;
@@ -214,6 +215,7 @@ struct Visitor {
     void visit(WhileStatement &);
     void visit(ForStatement &);
     void visit(BreakStatement &);
+    void visit(ReturnStatement &);
     void visit(Expression &);
     void visit(UnaryExpression &);
     void visit(BinaryExpression &);
@@ -460,6 +462,15 @@ struct ExpressionStatement : public Statement {
 
 struct BreakStatement : public Statement {
     void accept(Visitor &visitor) { visitor.visit(*this); }
+};
+
+struct ReturnStatement : public Statement {
+    Expression *expr;
+
+    void accept(Visitor &visitor) { visitor.visit(*this); }
+
+    ReturnStatement(Expression *_expr = nullptr):expr(_expr) {}
+    ~ReturnStatement();
 };
 
 // Expression
