@@ -186,8 +186,8 @@ void codegen(Declaration*);
 %type<stmt> do_while_statement
 %type<stmt> for_statement
 //%type<node> emptiable_expression
-%type<node> jump_statement
-%type<node> break_statement
+%type<stmt> jump_statement
+%type<stmt> break_statement
 %type<node> continue_statement
 %type<node> return_statement
 %type<stmt> compound_statement
@@ -345,7 +345,7 @@ jump_statement
     ;
 
 break_statement
-    : BREAK ';'     { set($$, STMT, $1, $2); }
+    : BREAK ';'     { $$ = new BreakStatement(); cleanup($1, $2); }
     ;
 
 continue_statement

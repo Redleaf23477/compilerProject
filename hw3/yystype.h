@@ -69,6 +69,7 @@ struct IfStatement;
 struct DoStatement;  // do-while
 struct WhileStatement; 
 struct ForStatement;
+struct BreakStatement;
 struct Expression;
 struct UnaryExpression;
 struct BinaryExpression;
@@ -210,6 +211,7 @@ struct Visitor {
     void visit(DoStatement &);
     void visit(WhileStatement &);
     void visit(ForStatement &);
+    void visit(BreakStatement &);
     void visit(Expression &);
     void visit(UnaryExpression &);
     void visit(BinaryExpression &);
@@ -450,6 +452,12 @@ struct ExpressionStatement : public Statement {
 
     ExpressionStatement(Expression *_expr):expr(_expr) {}
     ~ExpressionStatement();
+};
+
+// Break Statement
+
+struct BreakStatement : public Statement {
+    void accept(Visitor &visitor) { visitor.visit(*this); }
 };
 
 // Expression

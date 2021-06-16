@@ -518,6 +518,10 @@ void Visitor::visit(ExpressionStatement &expr_stmt) {
     dec_indent();
 }
 
+void Visitor::visit(BreakStatement &break_stmt) {
+    AST << indent() << "<BreakStatement>" << std::endl;
+}
+
 void Visitor::visit(Expression &expr) {
     AST << indent() << "<Expression>" << std::endl;
 }
