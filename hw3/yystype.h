@@ -113,10 +113,20 @@ struct SymbolTable {
     int frame_cnt;  // number of stuffs in current stack frame
 
     void set_frame_cnt(int size) { frame_cnt = size; }
-    int push_stack(int size) { return frame_cnt += size; }
-    void pop_stack(int size) { frame_cnt -= size; }
+    int push_stack(int size, int scope) { 
+        push("", scope, size, M_LOCAL, T_INT);
+        return frame_cnt; 
+    }
+    void pop_stack(int size) { 
+        if (table.back().size != size && "stack content incorrect!") {
+            Symbol* nd = NULL;
+            nd->scope = 7122;
+        }
+        frame_cnt -= size; 
+        table.pop_back();
+    }
 
-    void push(char *name, int scope, int size, VarMode mode, DataType type) {
+    void push(std::string name, int scope, int size, VarMode mode, DataType type) {
         frame_cnt += size;
         table.emplace_back((Symbol){name, scope, size, frame_cnt * WORD_SIZE, mode, type});
     }
@@ -128,12 +138,18 @@ struct SymbolTable {
         if (it == table.rend()) return nullptr;
         else return &(*it);
     }
-    int clear_to_scope(int scope) {
+    int clear_to_scope(int scope, bool fake_delete = false) {
         int remove_cnt = 0;
+        std::vector<Symbol> tmp;
         while (table.size() && table.back().scope > scope) {
             frame_cnt -= table.back().size; 
             remove_cnt += table.back().size;
+            tmp.emplace_back(table.back());
             table.pop_back();
+        }
+        if (fake_delete) {
+            table.insert(table.end(), tmp.begin(), tmp.end());
+            frame_cnt += remove_cnt;
         }
         return remove_cnt;
     }
@@ -345,9 +361,7 @@ struct FuncDefn : public Declaration {
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
 
-    FuncDefn(Type* _type, FuncDecl *decl, Statement *body):func_decl(decl), func_body(body) { 
-        func_decl->set_type(_type); 
-    }
+    FuncDefn(Type* _type, FuncDecl *decl, Statement *body);
     ~FuncDefn();
 };
 
@@ -388,8 +402,10 @@ struct ArrayDecl : public Declaration {
 // Statement Base Class
 
 struct Statement : public Node {
+    bool is_func_body;
 
     void accept(Visitor &visitor) { visitor.visit(*this); }
+    Statement():is_func_body(false){}
     virtual ~Statement() {}
 };
 

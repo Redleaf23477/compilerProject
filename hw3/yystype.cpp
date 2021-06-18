@@ -139,6 +139,11 @@ MultiDecl::~MultiDecl() {
     for (auto x : decl_list) delete x;
 }
 
+FuncDefn::FuncDefn(Type* _type, FuncDecl *decl, Statement *body):func_decl(decl), func_body(body) { 
+    func_decl->set_type(_type); 
+    func_body->is_func_body = true;
+}
+
 FuncDefn::~FuncDefn() {
     delete func_decl;
     delete func_body;
@@ -252,29 +257,40 @@ void Visitor::visit(FuncDefn &defn) {
 
     // store callee preserved registers
     save_regs_on_stack("callee", callee_preserved_registers);
-    symbol_table.push_stack(callee_preserved_registers.size());
+    symbol_table.push_stack(callee_preserved_registers.size(), scope.get_scope());
     // set new frame
     ASM << "  addi s0, sp, 104" << std::endl;
 
     // save parameters as local variables
     int arg_n = defn.func_decl->parameter_list.size();
+    ASM << "  addi sp, sp, " << -arg_n*WORD_SIZE << std::endl;
     for (int i = 0; i < arg_n; i++) {
         Declaration *decl = defn.func_decl->parameter_list[i];
         symbol_table.push(decl->token, scope.get_scope(), 1, M_LOCAL, decl->get_data_type());
         Symbol *sym = symbol_table.lookup(decl->token);
         ASM << "  sd " << arg_regs[i] << ", " << -sym->offset << "(fp)" << std::endl;
     }
-    ASM << "  addi sp, sp, " << -arg_n*WORD_SIZE << std::endl;
 
     inc_indent();
     defn.func_body->accept(*this);
     dec_indent();
 
+    // release parameters (local variables)
+    ASM << "  addi sp, sp, " << arg_n*WORD_SIZE << std::endl;
+    for (int i = 0; i < arg_n; i++) symbol_table.pop_stack(1);
+
+//    ASM << label_function_end() << ":" << std::endl;
+
+    int removed_local_cnt = symbol_table.clear_to_scope(scope.get_scope());
+    ASM << "  // clear local variable" << std::endl;
+    ASM << "  addi sp, sp, " << removed_local_cnt * WORD_SIZE << std::endl;
+
+    // XXX
     // restore callee preserved registers
     ASM << "  // release local variables" << std::endl;
+    ASM << "  // " << std::to_string(symbol_table.frame_cnt) << std::endl;
     ASM << "  addi sp, sp, " << WORD_SIZE * (symbol_table.frame_cnt - callee_preserved_registers.size()) << std::endl;
 
-    ASM << label_function_end() << ":" << std::endl;
     restore_regs_from_stack("callee", callee_preserved_registers);
     symbol_table.pop_stack(callee_preserved_registers.size());
 
@@ -353,6 +369,10 @@ void Visitor::visit(CompoundStatement &stmt) {
     for (auto c : stmt.stmt_decl_list) c->accept(*this);
     dec_indent();
     int recovered_scope = scope.leave();
+
+    if (stmt.is_func_body) {
+        ASM << label_function_end() << ":" << std::endl;
+    }
     int removed_local_cnt = symbol_table.clear_to_scope(recovered_scope);
     ASM << "  // clear local variable" << std::endl;
     ASM << "  addi sp, sp, " << removed_local_cnt * WORD_SIZE << std::endl;
@@ -368,7 +388,7 @@ void Visitor::visit(IfStatement &if_stmt) {
     int if_idx = new_if_label_set();
 
     // allocate temp for cond
-    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int cond_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
     if_stmt.cond->set_save_to_mem(cond_offset);
     if_stmt.cond->set_gen_rvalue();
     ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
@@ -414,7 +434,7 @@ void Visitor::visit(DoStatement &do_stmt) {
     enter_loop(loop_idx, scope.get_scope());
 
     // allocate temp for cond
-    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int cond_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
     do_stmt.cond->set_save_to_mem(cond_offset);
     do_stmt.cond->set_gen_rvalue();
     ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
@@ -454,7 +474,7 @@ void Visitor::visit(WhileStatement &while_stmt) {
     enter_loop(loop_idx, scope.get_scope());
 
     // allocate temp for cond
-    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int cond_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
     while_stmt.cond->set_save_to_mem(cond_offset);
     while_stmt.cond->set_gen_rvalue();
     ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
@@ -494,7 +514,7 @@ void Visitor::visit(ForStatement &for_stmt) {
     enter_loop(loop_idx, scope.get_scope());
 
     // allocate temp for cond
-    int cond_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int cond_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
     for_stmt.condition->set_save_to_mem(cond_offset);
     for_stmt.condition->set_gen_rvalue();
     ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
@@ -543,11 +563,17 @@ void Visitor::visit(ExpressionStatement &expr_stmt) {
 void Visitor::visit(BreakStatement &break_stmt) {
     AST << indent() << "<BreakStatement>" << std::endl;
 
+    ASM << "  // BreakStatement >>>" << std::endl;
+
     auto [loop_idx, loop_scope] = loop_stack.back();
-    int released_cnt = symbol_table.clear_to_scope(loop_scope);
+    int released_cnt = symbol_table.clear_to_scope(loop_scope, true);  // TODODODODODODODODODDODODODDODO
     ASM << "  addi sp, sp, " << released_cnt * WORD_SIZE << std::endl;
 
     ASM << "  j " << label_loop_end(loop_idx) << std::endl;
+
+    ASM << "  // <<< BreakStatement" << std::endl;
+
+    AST << indent() << "--> [break to scope: " << loop_scope << "]" << std::endl;
 }
 
 void Visitor::visit(ReturnStatement &return_stmt) {
@@ -556,7 +582,7 @@ void Visitor::visit(ReturnStatement &return_stmt) {
     ASM << "  // ReturnStatement >>>" << std::endl;
 
     // allocate temp
-    int tmp_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int tmp_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
     return_stmt.expr->set_save_to_mem(tmp_offset);
     return_stmt.expr->set_gen_rvalue();
     ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
@@ -571,8 +597,11 @@ void Visitor::visit(ReturnStatement &return_stmt) {
     symbol_table.pop_stack(1);
     ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
 
+    /*
+    // restore callee preserved registers
     ASM << "  // release local variables" << std::endl;
     ASM << "  addi sp, sp, " << WORD_SIZE * (symbol_table.frame_cnt - callee_preserved_registers.size()) << std::endl;
+    */
 
     ASM << "  j " << label_function_end() << std::endl;
     ASM << "  // <<< ReturnStatement" << std::endl;
@@ -591,7 +620,7 @@ void Visitor::visit(UnaryExpression &expr) {
     ASM << "  // UnaryExpression >>>" << std::endl;
 
     // allocate temp
-    int tmp_offset = symbol_table.push_stack(1) * WORD_SIZE;
+    int tmp_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
     expr.expr->set_save_to_mem(tmp_offset);
     ASM << "  addi sp, sp, " << -WORD_SIZE << std::endl;
 
@@ -662,8 +691,8 @@ void Visitor::visit(BinaryExpression &expr) {
     ASM << "  // Binary Expression >>>" << std::endl;
 
     // allocate temp
-    int lhs_offset = symbol_table.push_stack(1) * WORD_SIZE;
-    int rhs_offset = symbol_table.push_stack(1) * WORD_SIZE; 
+    int lhs_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
+    int rhs_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE; 
     expr.lhs->set_save_to_mem(lhs_offset);
     expr.rhs->set_save_to_mem(rhs_offset);
     ASM << "  addi sp, sp, " << -2*WORD_SIZE << std::endl;
@@ -759,7 +788,8 @@ void Visitor::visit(BinaryExpression &expr) {
     }
 
     // release temp
-    symbol_table.pop_stack(2);
+    symbol_table.pop_stack(1);
+    symbol_table.pop_stack(1);
     ASM << "  addi sp, sp, " << 2*WORD_SIZE << std::endl;
 
     ASM << "  // <<< BinaryExpression" << std::endl;
@@ -775,7 +805,7 @@ void Visitor::visit(CallExpression &expr) {
 
     // allocate temp
     int args_n = expr.argument_list.size();
-    int args_offset = symbol_table.push_stack(args_n) * WORD_SIZE;
+    int args_offset = symbol_table.push_stack(args_n, scope.get_scope()) * WORD_SIZE;
     ASM << "  addi sp, sp, " << -args_n*WORD_SIZE << std::endl;
 
     inc_indent();
@@ -827,8 +857,8 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
     ASM << "  // ArraySubscriptExpression >>>" << std::endl;
 
     // allocate temp
-    int expr_offset = symbol_table.push_stack(1) * WORD_SIZE;
-    int subscript_offset = symbol_table.push_stack(1) * WORD_SIZE; 
+    int expr_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE;
+    int subscript_offset = symbol_table.push_stack(1, scope.get_scope()) * WORD_SIZE; 
     expr.expr->set_save_to_mem(expr_offset);
     expr.subscript->set_save_to_mem(subscript_offset);
     ASM << "  addi sp, sp, " << -2*WORD_SIZE << std::endl;
@@ -863,7 +893,8 @@ void Visitor::visit(ArraySubscriptExpression &expr) {
     }
 
     // release temp
-    symbol_table.pop_stack(2);
+    symbol_table.pop_stack(1);
+    symbol_table.pop_stack(1);
     ASM << "  addi sp, sp, " << 2*WORD_SIZE << std::endl;
 
     ASM << "  // <<< ArraySubscriptExpression" << std::endl;
