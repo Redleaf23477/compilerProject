@@ -13,7 +13,7 @@ ARDUINO_MAIN = Spike/assembly/main.c
 
 all: ytab yystype scanner codegen
 
-judge: basic_test arithmetic_test pointer_test jump_test
+judge: basic_test arithmetic_test pointer_test jump_test function_test
 
 ytab: parser.y
 	${BYACC} -d parser.y

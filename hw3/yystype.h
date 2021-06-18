@@ -7,6 +7,7 @@
 #include <iostream>
 #include <fstream>
 #include <tuple>
+#include <algorithm>
 
 // #define YYSTYPE Node*
 
@@ -147,6 +148,7 @@ struct SymbolTable {
             tmp.emplace_back(table.back());
             table.pop_back();
         }
+        std::reverse(tmp.begin(), tmp.end());
         if (fake_delete) {
             table.insert(table.end(), tmp.begin(), tmp.end());
             frame_cnt += remove_cnt;

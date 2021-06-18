@@ -279,16 +279,13 @@ void Visitor::visit(FuncDefn &defn) {
     ASM << "  addi sp, sp, " << arg_n*WORD_SIZE << std::endl;
     for (int i = 0; i < arg_n; i++) symbol_table.pop_stack(1);
 
-//    ASM << label_function_end() << ":" << std::endl;
 
     int removed_local_cnt = symbol_table.clear_to_scope(scope.get_scope());
     ASM << "  // clear local variable" << std::endl;
     ASM << "  addi sp, sp, " << removed_local_cnt * WORD_SIZE << std::endl;
 
-    // XXX
     // restore callee preserved registers
     ASM << "  // release local variables" << std::endl;
-    ASM << "  // " << std::to_string(symbol_table.frame_cnt) << std::endl;
     ASM << "  addi sp, sp, " << WORD_SIZE * (symbol_table.frame_cnt - callee_preserved_registers.size()) << std::endl;
 
     restore_regs_from_stack("callee", callee_preserved_registers);
@@ -362,7 +359,7 @@ void Visitor::visit(CompoundStatement &stmt) {
     AST << "[scope = " << scope.get_scope() << "]";
     AST << std::endl;
 
-    // nothing to codegen :)
+    int backup = scope.get_scope();
 
     inc_indent();
     scope.enter();
@@ -370,12 +367,13 @@ void Visitor::visit(CompoundStatement &stmt) {
     dec_indent();
     int recovered_scope = scope.leave();
 
-    if (stmt.is_func_body) {
-        ASM << label_function_end() << ":" << std::endl;
-    }
     int removed_local_cnt = symbol_table.clear_to_scope(recovered_scope);
     ASM << "  // clear local variable" << std::endl;
     ASM << "  addi sp, sp, " << removed_local_cnt * WORD_SIZE << std::endl;
+
+    if (stmt.is_func_body) {
+        ASM << label_function_end() << ":" << std::endl;
+    }
 }
 
 void Visitor::visit(IfStatement &if_stmt) {
@@ -547,7 +545,7 @@ void Visitor::visit(ForStatement &for_stmt) {
     symbol_table.pop_stack(1);
     ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
 
-    ASM << "  // ForStatement >>>" << std::endl;
+    ASM << "  // <<< ForStatement" << std::endl;
 }
 
 void Visitor::visit(ExpressionStatement &expr_stmt) {
@@ -566,7 +564,7 @@ void Visitor::visit(BreakStatement &break_stmt) {
     ASM << "  // BreakStatement >>>" << std::endl;
 
     auto [loop_idx, loop_scope] = loop_stack.back();
-    int released_cnt = symbol_table.clear_to_scope(loop_scope, true);  // TODODODODODODODODODDODODODDODO
+    int released_cnt = symbol_table.clear_to_scope(loop_scope, true);  
     ASM << "  addi sp, sp, " << released_cnt * WORD_SIZE << std::endl;
 
     ASM << "  j " << label_loop_end(loop_idx) << std::endl;
@@ -596,6 +594,10 @@ void Visitor::visit(ReturnStatement &return_stmt) {
     // release temp
     symbol_table.pop_stack(1);
     ASM << "  addi sp, sp, " << WORD_SIZE << std::endl;
+
+    int released_cnt = symbol_table.clear_to_scope(0, true);  
+    ASM << "  // return release cnt = " << std::to_string(released_cnt) << std::endl;
+    ASM << "  addi sp, sp, " << released_cnt * WORD_SIZE << std::endl;
 
     /*
     // restore callee preserved registers
