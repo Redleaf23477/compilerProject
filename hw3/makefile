@@ -123,4 +123,4 @@ test:
 .PHONY: clean
 
 clean:
-	rm -f lex.yy.cpp y.tab.h y.tab.c y.output yystype.o parser codegen ast.txt codegen.S codegen.o basic_test out test
+	rm -f lex.yy.cpp y.tab.h y.tab.c y.output yystype.o parser codegen ast.txt codegen.S codegen.o basic_test arithmetic_test pointer_test jump_test function_test out test

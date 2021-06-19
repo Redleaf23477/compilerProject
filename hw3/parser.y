@@ -144,28 +144,28 @@ void codegen(Declaration*);
 %token<node> IF ELSE SWITCH CASE DEFAULT WHILE DO FOR RETURN BREAK CONTINUE
 
 // terminals represented by char
-%type<node> '!'
-%type<node> '%'
-%type<node> '&'
-%type<node> '('
-%type<node> ')'
-%type<node> '*'
-%type<node> '+'
-%type<node> ','
-%type<node> '-'
-%type<node> '/'
-%type<node> ':'
-%type<node> ';'
-%type<node> '<'
-%type<node> '='
-%type<node> '>'
-%type<node> '['
-%type<node> ']'
-%type<node> '^'
-%type<node> '{'
-%type<node> '|'
-%type<node> '}'
-%type<node> '~'
+%token<node> '!'
+%token<node> '%'
+%token<node> '&'
+%token<node> '('
+%token<node> ')'
+%token<node> '*'
+%token<node> '+'
+%token<node> ','
+%token<node> '-'
+%token<node> '/'
+%token<node> ':'
+%token<node> ';'
+%token<node> '<'
+%token<node> '='
+%token<node> '>'
+%token<node> '['
+%token<node> ']'
+%token<node> '^'
+%token<node> '{'
+%token<node> '|'
+%token<node> '}'
+%token<node> '~'
 
 // non-terminals
 
@@ -175,12 +175,12 @@ void codegen(Declaration*);
 %type<func_defn> function_definition
 %type<stmt> statement
 %type<expr_stmt> expression_statement
-%type<node> selection_statement
+%type<stmt> selection_statement
 %type<stmt> if_statement
-%type<node> switch_statement
-%type<node> switch_clause_list
-%type<node> switch_clause
-%type<node> statement_list
+//%type<node> switch_statement
+//%type<node> switch_clause_list
+//%type<node> switch_clause
+//%type<node> statement_list
 %type<stmt> iteration_statement
 %type<stmt> while_statement
 %type<stmt> do_while_statement
@@ -188,18 +188,18 @@ void codegen(Declaration*);
 //%type<node> emptiable_expression
 %type<stmt> jump_statement
 %type<stmt> break_statement
-%type<node> continue_statement
+//%type<node> continue_statement
 %type<stmt> return_statement
 %type<stmt> compound_statement
 %type<node_list> statement_declaration_list
 %type<expr> primary_expression
 %type<expr> suffix_expression
-%type<node> multidim_arr_list
+//%type<node> multidim_arr_list
 %type<expr_list> argument_expression_list
 %type<expr> prefix_expression
 // %type<node> unary_operator
-%type<node> type_name
-%type<node> specifier_qualifier_list
+//%type<node> type_name
+//%type<node> specifier_qualifier_list
 %type<expr> multiplicative_expression
 %type<expr> additive_expression
 %type<expr> shift_expression
@@ -226,7 +226,7 @@ void codegen(Declaration*);
 %type<decl> parameter_declaration
 %type<type> pointer
 %type<expr> initializer
-%type<node> initializer_list
+//%type<node> initializer_list
 
 %start codegen
 
@@ -246,7 +246,7 @@ external_declaration
       /* e.g. global variables, functions */
     : declaration
       /* e.g. int main() { ... } */
-    | function_definition
+    | function_definition { $$ = (Declaration*) $1; }
     ;
 
 /**********************************
@@ -266,11 +266,11 @@ function_definition
  **********************************/
 
 statement
-    : expression_statement 
-    | selection_statement
-    | iteration_statement
-    | jump_statement
-    | compound_statement
+    : expression_statement  { $$ = (Statement*) $1; }
+    | selection_statement   { $$ = (Statement*) $1; }   
+    | iteration_statement   { $$ = (Statement*) $1; }
+    | jump_statement        { $$ = (Statement*) $1; }
+    | compound_statement    { $$ = (Statement*) $1; }
     ;
 
 expression_statement
@@ -279,7 +279,7 @@ expression_statement
 
 selection_statement
     : if_statement
-    | switch_statement
+//    | switch_statement
     ;
 
 if_statement
@@ -288,6 +288,7 @@ if_statement
         $$ = new IfStatement($3, $5, $7); cleanup($1, $2, $4, $6); }
     ;
 
+/*
 switch_statement
     : SWITCH '(' expression ')' '{' '}' {
         set($$, STMT, $1, $2, $3, $4, $5, $6); }
@@ -311,6 +312,7 @@ statement_list
     : statement
     | statement statement_list  { set($$, NOTAG, $1, $2); }
     ;
+*/
 
 iteration_statement
     : while_statement
@@ -340,7 +342,7 @@ emptiable_expression
 
 jump_statement
     : break_statement
-    | continue_statement
+//    | continue_statement
     | return_statement
     ;
 
@@ -348,9 +350,11 @@ break_statement
     : BREAK ';'     { $$ = new BreakStatement(); cleanup($1, $2); }
     ;
 
+/*
 continue_statement
     : CONTINUE ';'  { set($$, STMT, $1, $2); }
     ;
+*/
 
 return_statement
     : RETURN ';'                { $$ = new ReturnStatement; cleanup($1, $2); }
@@ -392,13 +396,15 @@ suffix_expression
     | suffix_expression '(' argument_expression_list ')'        { $$ = new CallExpression($1, $3); cleanup($2, $3, $4); }
       /* array: hw spec differs from c / c++ spec */
     | IDENTIFIER '[' expression ']'                             { $$ = new ArraySubscriptExpression(new Identifier($1->token), $3); cleanup($1, $2, $4); }
-    | IDENTIFIER '[' expression ']' multidim_arr_list           //{ set($$, EXPR, $1, $2, $3, $4, $5); }
+//    | IDENTIFIER '[' expression ']' multidim_arr_list           //{ set($$, EXPR, $1, $2, $3, $4, $5); }
     ;
 
+/*
 multidim_arr_list
     : '[' expression ']'                        { set($$, NOTAG, $1, $2, $3); }
     | '[' expression ']' multidim_arr_list      { set($$, NOTAG, $1, $2, $3, $4); }
     ;
+*/
 
 argument_expression_list
     : assignment_expression                                 { $$ = new NodeList<Expression*>; $$->push($1); }
@@ -417,9 +423,9 @@ prefix_expression
     | '&' prefix_expression                 { $$ = new UnaryExpression(op_addr, $2); cleanup($1); }
     | '*' prefix_expression                 { $$ = new UnaryExpression(op_deref, $2); cleanup($1); } 
     | '-' prefix_expression                 { $$ = new UnaryExpression(op_neg, $2); cleanup($1); } 
-    | INC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
-    | DEC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
-    | '(' type_name ')' prefix_expression   //{ set($$, EXPR, $1, $2, $3, $4); }
+//    | INC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
+//    | DEC_OP prefix_expression              //{ set($$, EXPR, $1, $2); }
+//    | '(' type_name ')' prefix_expression   //{ set($$, EXPR, $1, $2, $3, $4); }
     ;
 
 /*
@@ -431,7 +437,6 @@ unary_operator
     | '+'
     | '-'
     ;
-*/
 
 type_name
     : specifier_qualifier_list
@@ -444,6 +449,7 @@ specifier_qualifier_list
     | type_specifier
     | type_specifier specifier_qualifier_list   { set($$, NOTAG, $1, $2); }
     ;
+*/
 
     /* Left precedence (Left to Right) */
 
@@ -572,8 +578,8 @@ init_declarator_list
 // declare without/with copy initialization
 init_declarator
     : declarator
-    | declarator '=' initializer   { $$ = $1; $$->set_initializer($3); cleanup($2); }
-    | function_declarator
+    | declarator '=' initializer    { $$ = $1; $$->set_initializer($3); cleanup($2); }
+    | function_declarator           { $$ = (Declaration*) $1; }
     ;
 
 // declare without/with pointer
@@ -619,13 +625,15 @@ pointer
 
 initializer
     : expression 
-    | '{' initializer_list '}'  // { set($$, NOTAG, $1, $2, $3); }
+//    | '{' initializer_list '}'  // { set($$, NOTAG, $1, $2, $3); }
     ;
 
+/*
 initializer_list
     : initializer
     | initializer ',' initializer_list  { set($$, NOTAG, $1, $2, $3); }
     ;
+*/
 
 %%
 
